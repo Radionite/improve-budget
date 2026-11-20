@@ -20,7 +20,7 @@ export function Layout() {
   return (
     <div className="app">
       <aside className="side">
-        <div className="brand"><Icon name="home" size={28} stroke="#8FAEF5" />Huisbudget</div>
+        <div className="brand"><Icon name="home" size={28} stroke="#8FAEF5" />Gezinsbank</div>
         <nav aria-label="Hoofdmenu">
           <ul className="nav">
             {NAV.map((n) => (

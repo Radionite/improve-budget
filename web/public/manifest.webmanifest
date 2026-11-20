@@ -1,6 +1,7 @@
 {
-  "name": "Huisbudget",
-  "short_name": "Huisbudget",
+  "name": "Gezinsbank",
+  "short_name": "Gezinsbank",
+  "description": "Ons huishoudbudget, samen beheerd",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0F1412",

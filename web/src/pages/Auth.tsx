@@ -53,7 +53,7 @@ export function AuthPage() {
   return (
     <div className="center-screen">
       <form className="card auth-card" onSubmit={submit}>
-        <div className="brand" style={{ padding: 0 }}><Icon name="home" size={28} stroke="#8FAEF5" />Huisbudget</div>
+        <div className="brand" style={{ padding: 0 }}><Icon name="home" size={28} stroke="#8FAEF5" />Gezinsbank</div>
         <h1 style={{ fontSize: 26 }}>{mode === 'login' ? 'Inloggen' : 'Account maken'}</h1>
         {mode === 'register' && (
           <div className="field"><label htmlFor="name">Je naam</label><input id="name" className="input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></div>

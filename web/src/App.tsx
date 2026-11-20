@@ -20,7 +20,7 @@ export function App() {
     return (
       <div className="center-screen">
         <div className="card auth-card">
-          <h1>Huisbudget</h1>
+          <h1>Gezinsbank</h1>
           <p className="muted">Firebase is nog niet ingesteld. Kopieer <code>web/.env.example</code> naar <code>web/.env</code> en vul de gegevens van je Firebase-project in. Zie de README.</p>
         </div>
       </div>

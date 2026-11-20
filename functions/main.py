@@ -1,4 +1,4 @@
-"""Cloud Functions voor Huisbudget.
+"""Cloud Functions voor Gezinsbank.
 
 verwerk_afschrift: wordt gestart zodra een bankafschrift is geüpload naar
   households/{hid}/statements/{sid}/{bestandsnaam}
@@ -31,7 +31,7 @@ def _clients(bucket_name: str):
         from google.cloud import firestore as gfs
         from google.cloud import storage as gcs
 
-        project = os.environ.get("GCLOUD_PROJECT", "demo-huisbudget")
+        project = os.environ.get("GCLOUD_PROJECT", "demo-gezinsbank")
         creds = AnonymousCredentials()
         return gfs.Client(project=project, credentials=creds), gcs.Client(project=project, credentials=creds).bucket(bucket_name)
     return firestore.client(), storage.bucket(bucket_name)

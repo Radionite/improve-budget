@@ -16,7 +16,7 @@ const config = {
 
 export const firebaseConfigured = useEmulators || Boolean(config.apiKey && config.projectId);
 
-const demo = { apiKey: 'demo-key', projectId: 'demo-huisbudget', appId: 'demo', storageBucket: 'demo-huisbudget.appspot.com' };
+const demo = { apiKey: 'demo-key', projectId: 'demo-gezinsbank', appId: 'demo', storageBucket: 'demo-gezinsbank.appspot.com' };
 export const app = initializeApp(useEmulators || !firebaseConfigured ? demo : config);
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, {

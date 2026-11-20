@@ -1,4 +1,6 @@
-# Huisbudget
+# Gezinsbank
+
+*Ons huishoudbudget, samen beheerd.*
 
 Webapp om samen het huishoudbudget te beheren: budget in procenten met advies per gezinssituatie,
 gezin/huisdieren/voertuigen, bankafschriften inlezen (de app vraagt wat iets is en onthoudt het),
@@ -93,7 +95,7 @@ Bij elke push naar `main` draait `.github/workflows/deploy.yml`. Stel in de repo
 Zonder echt Firebase-project, alles op je eigen computer:
 
 ```bash
-firebase emulators:start --project demo-huisbudget --only auth,firestore,storage,functions
+firebase emulators:start --project demo-gezinsbank --only auth,firestore,storage,functions
 ```
 
 ```bash
