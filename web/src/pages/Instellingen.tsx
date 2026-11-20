@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { arrayRemove, arrayUnion, deleteDoc, doc, getDocs, setDoc } from 'firebase/firestore';
+import { arrayRemove, arrayUnion, collection, deleteDoc, doc, getDocs, setDoc, writeBatch } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { PageHead } from '../components/Layout';
@@ -19,6 +19,7 @@ export function InstellingenPage() {
   const { household, hid, user, update } = useData();
   const [iban, setIban] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [restoreMsg, setRestoreMsg] = useState('');
   if (!household || !hid || !user) return null;
 
   const createInvite = async () => {
@@ -35,10 +36,16 @@ export function InstellingenPage() {
   const exportAll = async () => {
     setExporting(true);
     try {
-      const data: Record<string, unknown> = { exportedAt: new Date().toISOString(), household };
+      const data: Record<string, unknown> = { app: 'gezinsbank', version: 1, exportedAt: new Date().toISOString(), household };
       for (const name of SUBCOLLECTIONS) {
         const snap = await getDocs(col(hid, name));
-        data[name] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        data[name] = await Promise.all(snap.docs.map(async (d) => {
+          const row: Record<string, unknown> = { id: d.id, ...d.data() };
+          if (name === 'invoices' && d.data().fileChunks) {
+            row.files = (await getDocs(collection(d.ref, 'files'))).docs.map((f) => f.data());
+          }
+          return row;
+        }));
       }
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
@@ -48,6 +55,37 @@ export function InstellingenPage() {
       URL.revokeObjectURL(a.href);
     } finally {
       setExporting(false);
+    }
+  };
+
+  const restore = async (file: File | undefined) => {
+    if (!file) return;
+    setRestoreMsg('');
+    try {
+      const data = JSON.parse(await file.text());
+      if (data.app !== 'gezinsbank') throw new Error('Dit is geen back-up van Gezinsbank.');
+      if (!confirm(`Back-up van ${new Date(data.exportedAt).toLocaleString('nl-NL')} terugzetten? Bestaande gegevens met dezelfde id worden overschreven.`)) return;
+      setRestoreMsg('Bezig met terugzetten…');
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id: _id, members: _m, memberNames: _n, inviteCode: _c, joinCode: _j, ...fields } = data.household ?? {};
+      await update(fields);
+      let count = 0;
+      for (const name of SUBCOLLECTIONS) {
+        const rows = (data[name] ?? []) as Record<string, unknown>[];
+        for (let i = 0; i < rows.length; i += 300) {
+          const batch = writeBatch(db);
+          for (const { id, files, ...rest } of rows.slice(i, i + 300) as { id: string; files?: { n: number; data: string }[] }[]) {
+            const ref = doc(col(hid, name), id);
+            batch.set(ref, rest);
+            files?.forEach((f) => batch.set(doc(collection(ref, 'files'), String(f.n)), f));
+            count++;
+          }
+          await batch.commit();
+        }
+      }
+      setRestoreMsg(`Klaar: ${count} items teruggezet.`);
+    } catch (e) {
+      setRestoreMsg(e instanceof Error ? e.message : 'Terugzetten is mislukt.');
     }
   };
 
@@ -108,11 +146,17 @@ export function InstellingenPage() {
       <section className="card" aria-labelledby="h-backup">
         <h2 id="h-backup">Back-ups</h2>
         <ul className="stack small" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
-          <li><strong>Automatisch:</strong> Firebase maakt dagelijks een back-up van de database (instellen: zie de README). Die kan worden teruggezet als er iets misgaat.</li>
-          <li><strong>Zelf bewaren:</strong> download hieronder al je gegevens als één bestand en bewaar het waar je wilt.</li>
+          <li><strong>Automatisch:</strong> elke nacht maakt GitHub een versleutelde back-up van alles (instellen: zie de README). Die wordt 90 dagen bewaard.</li>
+          <li><strong>Zelf bewaren:</strong> download hieronder alles als één bestand, inclusief de facturen en foto's, en bewaar het waar je wilt.</li>
         </ul>
-        <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={exportAll} disabled={exporting}><Icon name="download" size={18} />{exporting ? 'Bezig…' : 'Alles downloaden (JSON)'}</button>
-        <p className="tiny muted">Facturen en foto's zelf staan in Firebase Storage en zitten niet in dit bestand; die worden apart meegenomen in de automatische back-up.</p>
+        <div className="row">
+          <button className="btn" onClick={exportAll} disabled={exporting}><Icon name="download" size={18} />{exporting ? 'Bezig…' : 'Alles downloaden'}</button>
+          <label className="btn" style={{ position: 'relative' }}>
+            <Icon name="upload" size={18} />Back-up terugzetten
+            <input type="file" accept="application/json,.json" className="sr-only" onChange={(e) => { restore(e.target.files?.[0]); e.target.value = ''; }} />
+          </label>
+        </div>
+        {restoreMsg && <p className="notice blue" role="status">{restoreMsg}</p>}
       </section>
 
       <section className="card" aria-labelledby="h-acc">

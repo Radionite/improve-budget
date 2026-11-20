@@ -1,0 +1,9 @@
+{
+  "name": "gezinsbank-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Back-up en terugzetten van de Gezinsbank-database",
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

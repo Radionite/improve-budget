@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { addDoc, deleteDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { storage } from '../firebase';
+import { deleteFile, loadFile, MAX_FILE_BYTES, prepareFile, saveFile } from '../lib/files';
 import { PageHead } from '../components/Layout';
 import { Icon } from '../components/Icon';
 import { byDateDesc, col, docRef, useCollection, useData } from '../lib/data';
@@ -33,6 +32,7 @@ export function FacturenPage() {
   const [search, setSearch] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({ product: '', shop: '', date: new Date().toISOString().slice(0, 10), amount: '', warrantyYears: '2', remind: true });
   if (!hid) return null;
 
@@ -46,30 +46,39 @@ export function FacturenPage() {
     e.preventDefault();
     if (!form.product.trim()) return;
     setBusy(true);
+    setError('');
     try {
+      const file = files[0];
+      const blob = file ? await prepareFile(file) : null;
+      if (blob && blob.size > MAX_FILE_BYTES) throw new Error('Dit bestand is groter dan 8 MB. Maak een kleinere foto of PDF.');
       const docu = await addDoc(col(hid, 'invoices'), {
         product: form.product.trim(), shop: form.shop.trim(), date: form.date, amount: num(form.amount),
         warrantyYears: num(form.warrantyYears), remind: form.remind, createdAt: serverTimestamp(),
       });
-      const file = files[0];
-      if (file) {
-        const path = `households/${hid}/invoices/${docu.id}/${file.name}`;
-        await uploadBytes(ref(storage, path), file);
-        await updateDoc(docu, { filePath: path, fileName: file.name, fileType: file.type });
+      if (file && blob) {
+        const chunks = await saveFile(docu, blob);
+        await updateDoc(docu, { fileName: file.name, fileType: blob.type || file.type, fileChunks: chunks });
       }
       setForm({ ...form, product: '', shop: '', amount: '' });
       setFiles([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Opslaan is mislukt.');
     } finally {
       setBusy(false);
     }
   };
 
   const open = async (inv: Invoice) => {
-    if (inv.filePath) window.open(await getDownloadURL(ref(storage, inv.filePath)), '_blank', 'noopener');
+    if (!inv.fileChunks) return;
+    const tab = window.open('', '_blank');
+    const blob = await loadFile(docRef(hid, 'invoices', inv.id), inv.fileType ?? '');
+    const url = URL.createObjectURL(blob);
+    if (tab) tab.location.href = url;
+    else window.location.href = url;
   };
   const remove = async (inv: Invoice) => {
     if (!confirm(`Factuur van ${inv.product} verwijderen?`)) return;
-    if (inv.filePath) await deleteObject(ref(storage, inv.filePath)).catch(() => {});
+    await deleteFile(docRef(hid, 'invoices', inv.id));
     await deleteDoc(docRef(hid, 'invoices', inv.id));
   };
 
@@ -108,7 +117,7 @@ export function FacturenPage() {
                       </td>
                       <td><span className={`pill ${s.pill}`}>{i.w.status === 'binnenkort' ? `Nog ${i.w.days} dagen` : s.label}</span></td>
                       <td className="right nowrap">
-                        {i.filePath && <button className="btn" style={{ minHeight: 40 }} onClick={() => open(i)} aria-label={`Bijlage van ${i.product} openen`}><Icon name="file" size={16} />{i.fileType?.startsWith('image/') ? 'Foto' : 'PDF'}</button>}
+                        {!!i.fileChunks && <button className="btn" style={{ minHeight: 40 }} onClick={() => open(i)} aria-label={`Bijlage van ${i.product} openen`}><Icon name="file" size={16} />{i.fileType?.startsWith('image/') ? 'Foto' : 'PDF'}</button>}
                         <button className="btn icon" aria-label={`${i.product} verwijderen`} onClick={() => remove(i)}><Icon name="x" size={18} /></button>
                       </td>
                     </tr>
@@ -145,7 +154,9 @@ export function FacturenPage() {
             </select>
           </div>
           <label className="check"><input type="checkbox" checked={form.remind} onChange={(e) => setForm({ ...form, remind: e.target.checked })} />Herinner mij 30 dagen voor het einde</label>
+          {error && <p className="notice red" role="alert">{error}</p>}
           <button className="btn primary" disabled={busy}>{busy ? 'Opslaan…' : 'Factuur opslaan'}</button>
+          <p className="tiny muted">Foto's worden verkleind opgeslagen; PDF's tot 8 MB.</p>
         </form>
       </div>
     </>

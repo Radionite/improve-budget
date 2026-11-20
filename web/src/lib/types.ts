@@ -63,7 +63,7 @@ export type Invoice = {
   amount: number;
   warrantyYears: number;
   remind: boolean;
-  filePath?: string;
+  fileChunks?: number;
   fileName?: string;
   fileType?: string;
 };

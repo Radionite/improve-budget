@@ -1,10 +1,10 @@
 import { useMemo, useState, type DragEvent } from 'react';
-import { addDoc, arrayUnion, deleteDoc, doc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
-import { ref, uploadBytes } from 'firebase/storage';
-import { db, storage } from '../firebase';
+import { addDoc, arrayUnion, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { db } from '../firebase';
+import { balanceOk, categorize, parseStatementFile, totalCredit, totalDebit, transactionId } from '../lib/statements';
 import { PageHead } from '../components/Layout';
 import { Icon } from '../components/Icon';
-import { byDateDesc, col, docRef, useCollection, useData } from '../lib/data';
+import { byDateDesc, col, docRef, recentOnly, useCollection, useData } from '../lib/data';
 import { useLinkOptions } from '../lib/commitments';
 import { GROUPS, TX_CATEGORY_NAMES, groupOf, type TxCategory } from '../lib/categories';
 import { groupTotals } from '../lib/budget';
@@ -17,11 +17,12 @@ const ACCEPT = '.pdf,.csv,.txt,.xml,.sta,.940,.mt940';
 export function ImportPage() {
   const { household, hid, user } = useData();
   const statements = useCollection<Statement & { createdAt?: { seconds: number } }>('statements');
-  const txs = useCollection<Transaction>('transactions', byDateDesc);
+  const txs = useCollection<Transaction>('transactions', recentOnly, byDateDesc);
   const rules = useCollection<Rule>('rules');
   const linkOptions = useLinkOptions();
 
   const [dragging, setDragging] = useState(false);
+  const [busy, setBusy] = useState('');
   const [remember, setRemember] = useState(true);
   const [askAll, setAskAll] = useState(false);
   const [skipped, setSkipped] = useState<string[]>([]);
@@ -34,16 +35,50 @@ export function ImportPage() {
   if (!household || !hid || !user) return null;
   const linkName = (v: string) => linkOptions.find((o) => o.value === v)?.label ?? 'Gezin algemeen';
 
-  // ---------- Uploaden ----------
+  // ---------- Inlezen (in de browser; het afschrift zelf wordt niet opgeslagen) ----------
   const upload = async (files: FileList | File[] | null) => {
     for (const file of Array.from(files ?? [])) {
-      const st = await addDoc(col(hid, 'statements'), { fileName: file.name, status: 'uploaden', uploadedBy: user.uid, createdAt: serverTimestamp() });
+      setBusy(`${file.name} wordt gelezen…`);
       try {
-        await uploadBytes(ref(storage, `households/${hid}/statements/${st.id}/${file.name}`), file);
-      } catch {
-        await updateDoc(st, { status: 'fout', error: 'Uploaden is mislukt. Probeer het opnieuw.' });
+        const st = await parseStatementFile(file);
+        const ids = await Promise.all(st.transactions.map(transactionId));
+        const existing = new Set<string>();
+        if (st.transactions.length) {
+          const dates = st.transactions.map((t) => t.date).sort();
+          const snap = await getDocs(query(col(hid, 'transactions'), where('date', '>=', dates[0]), where('date', '<=', dates[dates.length - 1])));
+          snap.docs.forEach((d) => existing.add(d.id));
+        }
+        const own = new Set((household.ownIbans ?? []).map((i) => i.replace(/\s/g, '').toUpperCase()));
+        const stRef = doc(col(hid, 'statements'));
+        const fresh = st.transactions.map((t, i) => ({ t, id: ids[i] })).filter((x) => !existing.has(x.id));
+        let openCount = 0;
+        for (let i = 0; i < fresh.length; i += 400) {
+          const batch = writeBatch(db);
+          for (const { t, id } of fresh.slice(i, i + 400)) {
+            const c = categorize(t, rules.items, own);
+            if (!c.cat) openCount++;
+            batch.set(docRef(hid, 'transactions', id), {
+              date: t.date, month: t.date.slice(0, 7), amount: t.amount, raw: t.raw, kind: t.kind, name: t.name,
+              iban: t.iban, description: t.description, place: t.place, bank: st.bank, statementId: stRef.id, ...c,
+              createdAt: serverTimestamp(),
+            });
+          }
+          await batch.commit();
+        }
+        await setDoc(stRef, {
+          fileName: file.name, status: 'klaar', bank: st.bank, account: st.account, periodFrom: st.periodFrom, periodTo: st.periodTo,
+          count: st.transactions.length, newCount: fresh.length, openCount, balanceOk: balanceOk(st),
+          openingBalance: st.openingBalance, closingBalance: st.closingBalance, totalDebit: totalDebit(st), totalCredit: totalCredit(st),
+          uploadedBy: user.uid, createdAt: serverTimestamp(),
+        });
+      } catch (e) {
+        await addDoc(col(hid, 'statements'), {
+          fileName: file.name, status: 'fout', error: e instanceof Error ? e.message : 'Inlezen is mislukt.',
+          uploadedBy: user.uid, createdAt: serverTimestamp(),
+        });
       }
     }
+    setBusy('');
   };
   const onDrop = (e: DragEvent) => { e.preventDefault(); setDragging(false); upload(e.dataTransfer.files); };
 
@@ -91,8 +126,9 @@ export function ImportPage() {
         <h2 id="h-upload">Afschrift aanleveren</h2>
         <label className={`drop${dragging ? ' over' : ''}`} onDragOver={(e) => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
           <Icon name="upload" size={28} stroke="#8FAEF5" />
-          <span style={{ fontWeight: 600 }}>Sleep je afschrift hierheen of klik om te kiezen</span>
+          <span style={{ fontWeight: 600 }} aria-live="polite">{busy || 'Sleep je afschrift hierheen of klik om te kiezen'}</span>
           <span className="small muted">Nu ondersteund: ABN AMRO PDF “Bij- en afschrijvingen”. ING en ASN volgen.</span>
+          <span className="tiny muted">Het afschrift wordt op dit apparaat gelezen; alleen de transacties worden opgeslagen.</span>
           <input type="file" multiple accept={ACCEPT} onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
         </label>
         {sortedStatements.length > 0 && (

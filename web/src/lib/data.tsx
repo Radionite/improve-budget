@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import {
-  collection, doc, onSnapshot, orderBy, query, updateDoc, type DocumentData, type QueryConstraint,
+  collection, doc, onSnapshot, orderBy, query, updateDoc, where, type DocumentData, type QueryConstraint,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import type { Household } from './types';
@@ -72,5 +72,13 @@ export function useCollection<T extends { id: string }>(name: string, ...constra
 }
 
 export const byDateDesc = orderBy('date', 'desc');
+
+/**
+ * Alleen de laatste 13 maanden live inlezen. Zo blijft het aantal leesacties
+ * ruim binnen de gratis limiet van Firestore (Spark: 50.000 per dag).
+ */
+const cutoff = new Date();
+cutoff.setMonth(cutoff.getMonth() - 13);
+export const recentOnly = where('date', '>=', cutoff.toISOString().slice(0, 10));
 export const col = (hid: string, name: string) => collection(db, 'households', hid, name);
 export const docRef = (hid: string, name: string, id: string) => doc(db, 'households', hid, name, id);

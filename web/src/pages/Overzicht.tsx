@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { PageHead } from '../components/Layout';
-import { byDateDesc, useCollection, useData } from '../lib/data';
+import { byDateDesc, recentOnly, useCollection, useData } from '../lib/data';
 import { useCommitments } from '../lib/commitments';
 import { GROUPS, groupOf } from '../lib/categories';
 import { groupTotals, totalPct } from '../lib/budget';
@@ -12,7 +12,7 @@ export function OverzichtPage() {
   const { household } = useData();
   const { monthly, loans, studyPayment } = useCommitments();
   const invoices = useCollection<Invoice>('invoices');
-  const txs = useCollection<Transaction>('transactions', byDateDesc);
+  const txs = useCollection<Transaction>('transactions', recentOnly, byDateDesc);
   if (!household) return null;
 
   const income = household.income || 0;
