@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(hid) {
+      return signedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/households/$(hid)).data.members;
+    }
+
+    // Eigen gebruikersprofiel: alleen jezelf.
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Uitnodigingscodes: iedereen die is ingelogd mag een code opzoeken,
+    // alleen leden van het huishouden mogen ze maken of intrekken.
+    match /invites/{code} {
+      allow read: if signedIn();
+      allow create: if isMember(request.resource.data.householdId);
+      allow delete: if isMember(resource.data.householdId);
+    }
+
+    match /households/{hid} {
+      allow create: if signedIn() && request.resource.data.members == [request.auth.uid];
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+
+      // Leden mogen alles bijwerken. Een niet-lid mag alleen zichzelf
+      // toevoegen, en alleen met de geldige uitnodigingscode.
+      allow update: if signedIn() && (
+        request.auth.uid in resource.data.members
+        || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberNames', 'joinCode'])
+          && request.resource.data.members == resource.data.members.concat([request.auth.uid])
+          && resource.data.inviteCode != ''
+          && request.resource.data.joinCode == resource.data.inviteCode
+        )
+      );
+      allow delete: if false;
+
+      // Alle gegevens van het huishouden: alleen voor leden.
+      match /{document=**} {
+        allow read, write: if isMember(hid);
+      }
+    }
+  }
+}

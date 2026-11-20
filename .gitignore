@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.local
+.firebaserc
+.firebase/
+*.log
+functions/venv/
+__pycache__/
+.pytest_cache/
+# Nooit echte bankafschriften of facturen in git
+*.pdf
+!functions/tests/fixtures/*.pdf
+*.csv
+service-account*.json
