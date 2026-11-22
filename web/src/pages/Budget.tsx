@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHead } from '../components/Layout';
-import { Segmented } from '../components/Fields';
+import { NumberInput, Segmented } from '../components/Fields';
 import { Icon } from '../components/Icon';
 import { useData } from '../lib/data';
 import { useCommitments } from '../lib/commitments';
@@ -70,14 +70,14 @@ export function BudgetPage() {
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div className="field" style={{ width: 240 }}>
             <label htmlFor="inc">Netto gezinsinkomen per maand (€)</label>
-            <input id="inc" className="input display" style={{ fontSize: 22, fontWeight: 600 }} type="number" inputMode="decimal" min={0} step={50} value={income} onChange={(e) => setIncome(e.target.value)} />
+            <NumberInput id="inc" value={num(income)} min={0} step={50} onChange={(v) => setIncome(String(v))} style={{ fontSize: 22, fontWeight: 600 }} />
           </div>
           <div className="stack" style={{ alignItems: 'flex-end' }}>
             <span className="small muted">Verdeeld</span>
-            <span className="display strong" style={{ fontSize: 28 }}>{pct(total)}</span>
-            {total === 100 && <span className="pill green">Alles is verdeeld</span>}
-            {total < 100 && <span className="pill orange">Nog {pct(100 - total)} te verdelen</span>}
-            {total > 100 && <span className="pill red">{pct(total - 100)} te veel verdeeld</span>}
+            <span className="display strong" style={{ fontSize: 28 }}>{p(total)}</span>
+            {Math.abs(100 - total) < 0.05 && <span className="pill green">Alles is verdeeld</span>}
+            {total < 99.95 && <span className="pill orange">Nog {p(100 - total)} te verdelen</span>}
+            {total > 100.05 && <span className="pill red">{p(total - 100)} te veel verdeeld</span>}
           </div>
         </div>
         <div className="stacked" role="img" aria-label="Verdeling over vaste lasten, leven en sparen">
@@ -89,7 +89,7 @@ export function BudgetPage() {
               <span className="dot" style={{ background: g.color, marginTop: 4 }} />
               <div className="stack" style={{ gap: 2 }}>
                 <span style={{ fontWeight: 600 }}>{g.name}</span>
-                <span className="small muted">{pct(groups[g.id])} · {euro((inc * groups[g.id]) / 100)} · advies {pct(recGroups[g.id])}</span>
+                <span className="small muted">{p(groups[g.id])} · {euro((inc * groups[g.id]) / 100)} · advies {p(recGroups[g.id])}</span>
               </div>
             </div>
           ))}
@@ -103,7 +103,7 @@ export function BudgetPage() {
               <span className="dot" style={{ background: g.color, width: 14, height: 14 }} />
               <div className="stack" style={{ gap: 2 }}><h2>{g.name}</h2><span className="small muted">{g.desc}</span></div>
             </div>
-            <span><span className="display strong" style={{ fontSize: 22 }}>{euro((inc * groups[g.id]) / 100)}</span> <span className="small muted">{pct(groups[g.id])} · advies {pct(recGroups[g.id])}</span></span>
+            <span><span className="display strong" style={{ fontSize: 22 }}>{euro((inc * groups[g.id]) / 100)}</span> <span className="small muted">{p(groups[g.id])} · advies {p(recGroups[g.id])}</span></span>
           </div>
           <ul className="list">
             {CATEGORIES.filter((c) => c.group === g.id).map((c) => (
@@ -126,21 +126,36 @@ function CategoryRow({ cat, name, value, rec, income, known, onChange }: {
   cat: CategoryKey; name: string; value: number; rec: number; income: number; known?: number; onChange: (v: number) => void;
 }) {
   const id = `r-${cat}`;
-  const knownPct = income && known ? (known / income) * 100 : 0;
+  const knownPct = income && known ? Math.round((known / income) * 1000) / 10 : 0;
+  const amount = Math.round((income * value) / 100);
   return (
     <li>
-      <div className="stack" style={{ flex: '1 1 200px', gap: 2 }}>
+      <div className="stack" style={{ flex: '1 1 220px', gap: 2 }}>
         <label htmlFor={id}>{name}</label>
-        {known ? <span className="tiny muted">Vastgelegd: {euro(known)} per maand ({pct(knownPct, 1)})</span> : null}
+        {known ? (
+          <span className="tiny muted">
+            Vastgelegd: {euro(known)} per maand ({p(knownPct)})
+            {Math.abs(knownPct - value) >= 0.1 && <button type="button" className="btn ghost tiny" style={{ minHeight: 28, padding: '0 6px' }} onClick={() => onChange(knownPct)}>overnemen</button>}
+          </span>
+        ) : null}
       </div>
-      <input id={id} type="range" min={0} max={40} step={1} value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ flex: '3 1 200px', width: 'auto' }} />
-      <span style={{ width: 44, fontWeight: 600 }} className="right">{pct(value)}</span>
+      <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+        <NumberInput id={id} value={value} min={0} max={100} step={1} onChange={(v) => onChange(Math.round(v * 10) / 10)} style={{ width: 76, textAlign: 'right' }} />
+        <span className="muted">%</span>
+      </div>
+      <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+        <span className="muted">€</span>
+        <NumberInput ariaLabel={`${name} in euro per maand`} value={amount} min={0} step={10} style={{ width: 100, textAlign: 'right' }}
+          onChange={(e) => income > 0 && onChange(Math.round((e / income) * 1000) / 10)} />
+      </div>
       <span style={{ width: 112, display: 'inline-flex', justifyContent: 'flex-end' }}>
-        {value === rec
+        {Math.abs(value - rec) < 0.05
           ? <span className="pill green"><Icon name="check" size={12} />advies</span>
-          : <span className="pill orange">advies {pct(rec)}</span>}
+          : <button type="button" className="pill orange" style={{ border: 0, cursor: 'pointer', font: 'inherit', fontSize: 12, fontWeight: 600 }} title="Advies overnemen" onClick={() => onChange(rec)}>advies {p(rec)}</button>}
       </span>
-      <span style={{ width: 80 }} className="right muted">{euro((income * value) / 100)}</span>
     </li>
   );
 }
+
+/** Percentage tonen: hele getallen zonder decimaal, anders 1 decimaal. */
+const p = (n: number) => pct(n, Math.abs(n - Math.round(n)) < 0.05 ? 0 : 1);

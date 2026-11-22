@@ -50,21 +50,60 @@ export function SelectField({ label, value, options, onChange, hideLabel = false
   );
 }
 
-export function Slider({ label, value, display, min, max, step, onChange, minLabel, maxLabel }: {
-  label: string; value: number; display: string; min: number; max: number; step: number; onChange: (v: number) => void; minLabel?: string; maxLabel?: string;
+/**
+ * Invulveld voor een getal met label en de opgemaakte waarde ernaast.
+ * (Heette eerder een schuifregelaar; max/minLabel/maxLabel worden niet meer gebruikt.)
+ */
+export function Slider({ label, value, display, min, step, onChange, hint }: {
+  label: string; value: number; display: string; min: number; max?: number; step: number; onChange: (v: number) => void; minLabel?: string; maxLabel?: string; hint?: string;
 }) {
   const id = useId();
   return (
     <div className="stack" style={{ gap: 4 }}>
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <label htmlFor={id} style={{ fontSize: 14, fontWeight: 500 }}>{label}</label>
-        <span className="display strong" style={{ fontSize: 18 }}>{display}</span>
+        <span className="small muted">{display}</span>
       </div>
-      <input id={id} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
-      {(minLabel || maxLabel) && <div className="row tiny muted" style={{ justifyContent: 'space-between' }}><span>{minLabel}</span><span>{maxLabel}</span></div>}
+      <NumberInput id={id} value={value} min={min} step={step} onChange={onChange} />
+      {hint && <span className="tiny muted">{hint}</span>}
     </div>
   );
 }
+
+/**
+ * Getalveld dat meteen doorgeeft wat je typt (komma of punt), zonder te springen
+ * tijdens het typen. Waarden buiten min/max worden begrensd.
+ */
+export function NumberInput({ id, value, onChange, min, max, step = 1, ariaLabel, style }: {
+  id?: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; ariaLabel?: string; style?: React.CSSProperties;
+}) {
+  const [text, setText] = useState(fmt(value));
+  const [focused, setFocused] = useState(false);
+  useEffect(() => { if (!focused) setText(fmt(value)); }, [value, focused]);
+  const clamp = (n: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n));
+  return (
+    <input id={id} aria-label={ariaLabel} className="input" style={style} type="text" inputMode="decimal" value={text}
+      onFocus={(e) => { setFocused(true); e.target.select(); }}
+      onChange={(e) => {
+        setText(e.target.value);
+        const n = parseFloat(e.target.value.replace(/\./g, '').replace(',', '.'));
+        if (Number.isFinite(n)) onChange(clamp(n));
+        else if (e.target.value.trim() === '') onChange(clamp(0));
+      }}
+      onBlur={() => { setFocused(false); setText(fmt(value)); }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          const next = clamp(Math.round((value + (e.key === 'ArrowUp' ? step : -step)) * 100) / 100);
+          onChange(next);
+          setText(fmt(next));
+        }
+      }} />
+  );
+}
+
+const fmt = (n: number) => (Number.isFinite(n) ? String(Math.round(n * 100) / 100).replace('.', ',') : '');
 
 export function Segmented<T extends string | number | boolean>({ label, value, options, onChange }: {
   label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void;
