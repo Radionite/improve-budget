@@ -5,8 +5,10 @@ export type CategoryKey =
   | 'boodschappen' | 'dieren' | 'kleding' | 'verzorging' | 'vrijetijd' | 'zakouders' | 'zakkind' | 'overig'
   | 'buffer' | 'beleggen' | 'studiekind' | 'vakantie' | 'aankopen';
 
-/** Categorieën voor transacties: budgetcategorieën plus inkomen en eigen rekening. */
-export type TxCategory = CategoryKey | 'inkomen' | 'eigen';
+/** Categorie van een transactie: een budgetcategorie (ook eigen categorieën), 'inkomen' of 'eigen'. */
+export type TxCategory = string;
+
+export type Category = { key: string; name: string; group: GroupId; custom?: boolean };
 
 export const GROUPS: { id: GroupId; name: string; desc: string; color: string }[] = [
   { id: 'vast', name: 'Vaste lasten', desc: 'Wonen, energie, verzekeringen, vervoer, opvang en aflossingen', color: '#4F7BE8' },

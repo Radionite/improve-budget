@@ -1,48 +1,82 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHead } from '../components/Layout';
 import { NumberInput, Segmented } from '../components/Fields';
 import { Icon } from '../components/Icon';
 import { useData } from '../lib/data';
 import { useCommitments } from '../lib/commitments';
-import { CATEGORIES, GROUPS, type CategoryKey } from '../lib/categories';
-import { groupTotals, recommend, situationName, totalPct, type BudgetPct, type Situation } from '../lib/budget';
-import { euro, num, pct } from '../lib/format';
+import { GROUPS, type Category, type GroupId } from '../lib/categories';
+import { recommend, situationName, type Situation } from '../lib/budget';
+import { budgetAmounts, useCategories } from '../lib/useCategories';
+import { euro, pct } from '../lib/format';
+
+/** Percentage tonen: hele getallen zonder decimaal, anders 1 decimaal. */
+const p = (n: number) => pct(n, Math.abs(n - Math.round(n)) < 0.05 ? 0 : 1);
+const round1 = (n: number) => Math.round(n * 10) / 10;
+const cents = (n: number) => Math.round(n * 100) / 100;
 
 export function BudgetPage() {
   const { household, update } = useData();
   const { monthly, derived } = useCommitments();
-  const [draft, setDraft] = useState<BudgetPct>(household?.budget ?? {});
-  const [income, setIncome] = useState(String(household?.income ?? 0));
+  const cats = useCategories();
+  const stored = useMemo(() => budgetAmounts(household), [household]);
+  const [draft, setDraft] = useState<Record<string, number>>(stored);
+  const [income, setIncome] = useState(household?.income ?? 0);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => { setDraft(household?.budget ?? {}); }, [household?.budget]);
-  useEffect(() => { setIncome(String(household?.income ?? 0)); }, [household?.income]);
+  useEffect(() => { setDraft(stored); }, [stored]);
+  useEffect(() => { setIncome(household?.income ?? 0); }, [household?.income]);
 
-  const inc = num(income);
   const situation: Situation = derived ?? household?.situation ?? { adults: 2, kids: 0, pets: false, cars: 0 };
   const rec = useMemo(() => recommend(situation, {
-    studieschuld: inc ? ((monthly.studieschuld ?? 0) / inc) * 100 : 0,
-    lening: inc ? ((monthly.lening ?? 0) / inc) * 100 : 0,
-  }), [situation, inc, monthly.studieschuld, monthly.lening]);
+    studieschuld: income ? ((monthly.studieschuld ?? 0) / income) * 100 : 0,
+    lening: income ? ((monthly.lening ?? 0) / income) * 100 : 0,
+  }), [situation, income, monthly.studieschuld, monthly.lening]) as Record<string, number>;
 
   if (!household) return null;
-  const total = totalPct(draft);
-  const groups = groupTotals(draft);
-  const recGroups = groupTotals(rec);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(household.budget ?? {}) || inc !== household.income;
 
+  const share = (amount: number) => (income ? (amount / income) * 100 : 0);
+  const sum = cats.visible.reduce((s, c) => s + (draft[c.key] ?? 0), 0);
+  const left = cents(income - sum);
+  const groups = cats.groupSums(draft);
+  const recGroups: Record<GroupId, number> = { vast: 0, leven: 0, sparen: 0 };
+  cats.visible.forEach((c) => { if (!c.custom) recGroups[c.group] += rec[c.key] ?? 0; });
+  const dirty = JSON.stringify(draft) !== JSON.stringify(stored) || income !== household.income;
+
+  const setAmount = (key: string, v: number) => setDraft({ ...draft, [key]: cents(Math.max(0, v)) });
   const save = async () => {
-    await update({ budget: draft, income: inc });
+    await update({ budgetAmounts: draft, income });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
+  const applyAdvice = () => {
+    const next = { ...draft };
+    cats.visible.filter((c) => !c.custom).forEach((c) => { next[c.key] = Math.round((income * (rec[c.key] ?? 0)) / 100); });
+    setDraft(next);
+  };
   const setSituation = (patch: Partial<Situation>) => update({ situation: { ...situation, ...patch } });
+
+  const addCategory = async (group: GroupId, name: string) => {
+    const key = `c_${Math.random().toString(36).slice(2, 8)}`;
+    await update({ customCategories: [...(household.customCategories ?? []), { key, name, group }], budgetAmounts: draft, income });
+  };
+  const removeCategory = async (c: Category) => {
+    if ((draft[c.key] ?? 0) > 0 && !confirm(`${c.name} verwijderen? Het bedrag van ${euro(draft[c.key])} vervalt.`)) return;
+    const next = { ...draft };
+    delete next[c.key];
+    setDraft(next);
+    if (c.custom) {
+      await update({ customCategories: (household.customCategories ?? []).filter((x) => x.key !== c.key), budgetAmounts: next, income });
+    } else {
+      await update({ hiddenCategories: [...(household.hiddenCategories ?? []), c.key], budgetAmounts: next, income });
+    }
+  };
+  const showCategory = (key: string) => update({ hiddenCategories: (household.hiddenCategories ?? []).filter((k) => k !== key), budgetAmounts: draft, income });
 
   return (
     <>
       <PageHead eyebrow="Maandbudget" title="Budget verdelen">
-        <button className="btn" onClick={() => setDraft({ ...rec })}>Advies overnemen</button>
+        <button className="btn" onClick={applyAdvice} title="Zet alle standaardcategorieën op het advies">Advies overnemen</button>
         <button className="btn primary" onClick={save} disabled={!dirty}>{saved ? 'Opgeslagen' : 'Opslaan'}</button>
       </PageHead>
 
@@ -70,18 +104,18 @@ export function BudgetPage() {
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div className="field" style={{ width: 240 }}>
             <label htmlFor="inc">Netto gezinsinkomen per maand (€)</label>
-            <NumberInput id="inc" value={num(income)} min={0} step={50} onChange={(v) => setIncome(String(v))} style={{ fontSize: 22, fontWeight: 600 }} />
+            <NumberInput id="inc" value={income} min={0} step={50} onChange={(v) => setIncome(cents(v))} style={{ fontSize: 22, fontWeight: 600 }} />
           </div>
           <div className="stack" style={{ alignItems: 'flex-end' }}>
             <span className="small muted">Verdeeld</span>
-            <span className="display strong" style={{ fontSize: 28 }}>{p(total)}</span>
-            {Math.abs(100 - total) < 0.05 && <span className="pill green">Alles is verdeeld</span>}
-            {total < 99.95 && <span className="pill orange">Nog {p(100 - total)} te verdelen</span>}
-            {total > 100.05 && <span className="pill red">{p(total - 100)} te veel verdeeld</span>}
+            <span className="display strong" style={{ fontSize: 28 }}>{euro(sum)} <span className="small muted">{p(share(sum))}</span></span>
+            {Math.abs(left) < 0.5 && <span className="pill green">Alles is verdeeld</span>}
+            {left >= 0.5 && <span className="pill orange">Nog {euro(left)} te verdelen</span>}
+            {left <= -0.5 && <span className="pill red">{euro(-left)} te veel verdeeld</span>}
           </div>
         </div>
         <div className="stacked" role="img" aria-label="Verdeling over vaste lasten, leven en sparen">
-          {GROUPS.map((g) => <span key={g.id} style={{ flex: `0 0 ${Math.min(groups[g.id], 100)}%`, background: g.color }} />)}
+          {GROUPS.map((g) => <span key={g.id} style={{ flex: `0 0 ${Math.min(share(groups[g.id]), 100)}%`, background: g.color }} />)}
         </div>
         <div className="grid">
           {GROUPS.map((g) => (
@@ -89,7 +123,7 @@ export function BudgetPage() {
               <span className="dot" style={{ background: g.color, marginTop: 4 }} />
               <div className="stack" style={{ gap: 2 }}>
                 <span style={{ fontWeight: 600 }}>{g.name}</span>
-                <span className="small muted">{p(groups[g.id])} · {euro((inc * groups[g.id]) / 100)} · advies {p(recGroups[g.id])}</span>
+                <span className="small muted">{euro(groups[g.id])} · {p(share(groups[g.id]))} · advies {p(recGroups[g.id])}</span>
               </div>
             </div>
           ))}
@@ -103,59 +137,89 @@ export function BudgetPage() {
               <span className="dot" style={{ background: g.color, width: 14, height: 14 }} />
               <div className="stack" style={{ gap: 2 }}><h2>{g.name}</h2><span className="small muted">{g.desc}</span></div>
             </div>
-            <span><span className="display strong" style={{ fontSize: 22 }}>{euro((inc * groups[g.id]) / 100)}</span> <span className="small muted">{p(groups[g.id])} · advies {p(recGroups[g.id])}</span></span>
+            <span><span className="display strong" style={{ fontSize: 22 }}>{euro(groups[g.id])}</span> <span className="small muted">{p(share(groups[g.id]))} · advies {p(recGroups[g.id])}</span></span>
           </div>
           <ul className="list">
-            {CATEGORIES.filter((c) => c.group === g.id).map((c) => (
-              <CategoryRow key={c.key} cat={c.key} name={c.name} value={draft[c.key] ?? 0} rec={rec[c.key]} income={inc} known={monthly[c.key]}
-                onChange={(v) => setDraft({ ...draft, [c.key]: v })} />
+            {cats.visible.filter((c) => c.group === g.id).map((c) => (
+              <CategoryRow key={c.key} cat={c} amount={draft[c.key] ?? 0} income={income} rec={c.custom ? null : rec[c.key] ?? 0} known={(monthly as Record<string, number | undefined>)[c.key]}
+                onChange={(v) => setAmount(c.key, v)} onRemove={() => removeCategory(c)} />
             ))}
           </ul>
+          <AddCategory onAdd={(name) => addCategory(g.id, name)} />
         </section>
       ))}
 
+      {cats.hidden.length > 0 && (
+        <section className="card" aria-labelledby="h-hidden">
+          <h2 id="h-hidden" style={{ fontSize: 16 }}>Verborgen categorieën</h2>
+          <div className="row">
+            {cats.hidden.map((c) => <button key={c.key} type="button" className="btn" onClick={() => showCategory(c.key)}><Icon name="plus" size={16} />{c.name}</button>)}
+          </div>
+        </section>
+      )}
+
       <p className="small muted" style={{ maxWidth: 780 }}>
-        Het advies is een vertrekpunt op basis van je gezinssituatie: meer boodschappen en opvang bij kinderen, een post voor huisdieren, meer voor vervoer per auto.
-        Aflossingen en studiesparen gaan voor; de rest schuift daarvoor op. Het is geen officieel advies: pas het aan op jullie situatie.
+        Vul per categorie een bedrag of een percentage in; het bedrag wordt bewaard. Het advies is een vertrekpunt op basis van je gezinssituatie,
+        geen officieel advies. Eigen categorieën hebben geen advies.
       </p>
     </>
   );
 }
 
-function CategoryRow({ cat, name, value, rec, income, known, onChange }: {
-  cat: CategoryKey; name: string; value: number; rec: number; income: number; known?: number; onChange: (v: number) => void;
+function CategoryRow({ cat, amount, income, rec, known, onChange, onRemove }: {
+  cat: Category; amount: number; income: number; rec: number | null; known?: number; onChange: (v: number) => void; onRemove: () => void;
 }) {
-  const id = `r-${cat}`;
-  const knownPct = income && known ? Math.round((known / income) * 1000) / 10 : 0;
-  const amount = Math.round((income * value) / 100);
+  const id = `r-${cat.key}`;
+  const share = income ? (amount / income) * 100 : 0;
   return (
     <li>
       <div className="stack" style={{ flex: '1 1 220px', gap: 2 }}>
-        <label htmlFor={id}>{name}</label>
+        <span className="row" style={{ gap: 8 }}><label htmlFor={id}>{cat.name}</label>{cat.custom && <span className="pill gray">eigen</span>}</span>
         {known ? (
           <span className="tiny muted">
-            Vastgelegd: {euro(known)} per maand ({p(knownPct)})
-            {Math.abs(knownPct - value) >= 0.1 && <button type="button" className="btn ghost tiny" style={{ minHeight: 28, padding: '0 6px' }} onClick={() => onChange(knownPct)}>overnemen</button>}
+            Vastgelegd: {euro(known)} per maand
+            {Math.abs(known - amount) >= 0.5 && <button type="button" className="btn ghost tiny" style={{ minHeight: 28, padding: '0 6px' }} onClick={() => onChange(Math.round(known))}>overnemen</button>}
           </span>
         ) : null}
       </div>
       <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
-        <NumberInput id={id} value={value} min={0} max={100} step={1} onChange={(v) => onChange(Math.round(v * 10) / 10)} style={{ width: 76, textAlign: 'right' }} />
-        <span className="muted">%</span>
+        <span className="muted">€</span>
+        <NumberInput id={id} value={amount} min={0} step={10} onChange={onChange} style={{ width: 110, textAlign: 'right' }} />
       </div>
       <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
-        <span className="muted">€</span>
-        <NumberInput ariaLabel={`${name} in euro per maand`} value={amount} min={0} step={10} style={{ width: 100, textAlign: 'right' }}
-          onChange={(e) => income > 0 && onChange(Math.round((e / income) * 1000) / 10)} />
+        <NumberInput ariaLabel={`${cat.name} in procent van het inkomen`} value={round1(share)} min={0} max={100} step={1}
+          onChange={(v) => income > 0 && onChange(Math.round((income * v) / 100))} style={{ width: 76, textAlign: 'right' }} />
+        <span className="muted">%</span>
       </div>
       <span style={{ width: 112, display: 'inline-flex', justifyContent: 'flex-end' }}>
-        {Math.abs(value - rec) < 0.05
-          ? <span className="pill green"><Icon name="check" size={12} />advies</span>
-          : <button type="button" className="pill orange" style={{ border: 0, cursor: 'pointer', font: 'inherit', fontSize: 12, fontWeight: 600 }} title="Advies overnemen" onClick={() => onChange(rec)}>advies {p(rec)}</button>}
+        {rec === null ? <span className="tiny muted">geen advies</span>
+          : Math.abs(share - rec) < 0.5
+            ? <span className="pill green"><Icon name="check" size={12} />advies</span>
+            : <button type="button" className="pill orange" style={{ border: 0, cursor: 'pointer', font: 'inherit', fontSize: 12, fontWeight: 600 }} title={`Advies overnemen: ${euro((income * rec) / 100)}`} onClick={() => onChange(Math.round((income * rec) / 100))}>advies {p(rec)}</button>}
       </span>
+      <button type="button" className="btn icon" aria-label={cat.custom ? `${cat.name} verwijderen` : `${cat.name} verbergen`} title={cat.custom ? 'Verwijderen' : 'Verbergen'} onClick={onRemove}><Icon name="x" size={16} /></button>
     </li>
   );
 }
 
-/** Percentage tonen: hele getallen zonder decimaal, anders 1 decimaal. */
-const p = (n: number) => pct(n, Math.abs(n - Math.round(n)) < 0.05 ? 0 : 1);
+function AddCategory({ onAdd }: { onAdd: (name: string) => Promise<void> }) {
+  const [name, setName] = useState('');
+  const [open, setOpen] = useState(false);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    await onAdd(name.trim());
+    setName('');
+    setOpen(false);
+  };
+  if (!open) {
+    return <button type="button" className="btn ghost" style={{ alignSelf: 'flex-start', marginTop: 8, marginLeft: -12 }} onClick={() => setOpen(true)}><Icon name="plus" size={16} />Categorie toevoegen</button>;
+  }
+  return (
+    <form className="row" style={{ marginTop: 12 }} onSubmit={submit}>
+      <input className="input" style={{ maxWidth: 280 }} aria-label="Naam nieuwe categorie" placeholder="Bijv. Sportschool" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+      <button className="btn primary" disabled={!name.trim()}>Toevoegen</button>
+      <button type="button" className="btn ghost" onClick={() => setOpen(false)}>Annuleren</button>
+    </form>
+  );
+}

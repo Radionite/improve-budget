@@ -6,12 +6,11 @@ import { PageHead } from '../components/Layout';
 import { Icon } from '../components/Icon';
 import { byDateDesc, col, docRef, recentOnly, useCollection, useData } from '../lib/data';
 import { useLinkOptions } from '../lib/commitments';
-import { GROUPS, TX_CATEGORY_NAMES, groupOf, type TxCategory } from '../lib/categories';
-import { groupTotals } from '../lib/budget';
+import { GROUPS, type TxCategory } from '../lib/categories';
+import { budgetAmounts, useCategories } from '../lib/useCategories';
 import { euro, longDate, monthLabel, shortDate, signedEuro } from '../lib/format';
 import type { Rule, Statement, Transaction } from '../lib/types';
 
-const CAT_OPTIONS = Object.entries(TX_CATEGORY_NAMES) as [TxCategory, string][];
 const ACCEPT = '.pdf,.csv,.txt,.xml,.sta,.940,.mt940';
 
 export function ImportPage() {
@@ -20,6 +19,7 @@ export function ImportPage() {
   const txs = useCollection<Transaction>('transactions', recentOnly, byDateDesc);
   const rules = useCollection<Rule>('rules');
   const linkOptions = useLinkOptions();
+  const cats = useCategories();
 
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState('');
@@ -111,9 +111,8 @@ export function ImportPage() {
 
   // ---------- Overzicht van de maand ----------
   const monthTx = txs.items.filter((t) => t.month === activeMonth);
-  const pcts = groupTotals(household.budget ?? {});
-  const income = household.income || 0;
-  const spentPer = (g: string) => monthTx.filter((t) => t.amount < 0 && groupOf(t.cat) === g).reduce((s, t) => s - t.amount, 0);
+  const budgetPer = cats.groupSums(budgetAmounts(household));
+  const spentPer = (g: string) => monthTx.filter((t) => t.amount < 0 && cats.groupOf(t.cat) === g).reduce((s, t) => s - t.amount, 0);
   const incomeIn = monthTx.filter((t) => t.amount > 0 && t.cat === 'inkomen').reduce((s, t) => s + t.amount, 0);
 
   const sortedStatements = [...statements.items].sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
@@ -158,7 +157,7 @@ export function ImportPage() {
           <div className="bar" aria-hidden="true"><span style={{ width: `${openTotal + answered ? (answered / (openTotal + answered)) * 100 : 100}%`, background: 'var(--green)' }} /></div>
 
           {current ? (
-            <QuestionCard t={current} remember={remember} setRemember={setRemember} linkValue={link[current.id] ?? current.link ?? ''} linkOptions={linkOptions}
+            <QuestionCard t={current} names={cats.names} options={cats.txOptions} remember={remember} setRemember={setRemember} linkValue={link[current.id] ?? current.link ?? ''} linkOptions={linkOptions}
               onLink={(v) => setLink({ ...link, [current.id]: v })} onAnswer={(c) => answer(current, c)} onSkip={() => setSkipped([...skipped, current.id])} />
           ) : skipped.length > 0 ? (
             <div className="notice orange row" style={{ justifyContent: 'space-between' }}>
@@ -205,7 +204,7 @@ export function ImportPage() {
         <div className="grid" style={{ '--min': '240px' } as React.CSSProperties}>
           {GROUPS.map((g) => {
             const spent = spentPer(g.id);
-            const budget = (income * pcts[g.id]) / 100;
+            const budget = budgetPer[g.id];
             const left = budget - spent;
             return (
               <div key={g.id} className="stack">
@@ -238,7 +237,7 @@ export function ImportPage() {
                   <td>
                     <select className="input" style={{ width: 210, minHeight: 40 }} aria-label={`Categorie voor ${t.name}`} value={t.cat} onChange={(e) => e.target.value && answer(t, e.target.value as TxCategory)}>
                       <option value="">Nog niet ingedeeld</option>
-                      {CAT_OPTIONS.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
+                      {cats.txOptions.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
                     </select>
                   </td>
                   <td>
@@ -264,7 +263,7 @@ export function ImportPage() {
           {rules.items.map((r) => (
             <li key={r.id}>
               <span className="strong" style={{ flex: '1 1 220px' }}>{r.match}</span>
-              <span className="row" style={{ flex: '1 1 220px', gap: 8 }}><Icon name="arrow" size={16} />{TX_CATEGORY_NAMES[r.cat]}</span>
+              <span className="row" style={{ flex: '1 1 220px', gap: 8 }}><Icon name="arrow" size={16} />{cats.names[r.cat] ?? r.cat}</span>
               <span className="muted small" style={{ flex: '0 1 160px' }}>{r.link ? linkName(r.link) : ''}</span>
               <button className="btn icon" aria-label={`${r.match} vergeten`} onClick={() => deleteDoc(docRef(hid, 'rules', r.id))}><Icon name="x" size={18} /></button>
             </li>
@@ -291,8 +290,8 @@ function StatementStatus({ s }: { s: Statement }) {
   );
 }
 
-function QuestionCard({ t, remember, setRemember, linkValue, linkOptions, onLink, onAnswer, onSkip }: {
-  t: Transaction; remember: boolean; setRemember: (v: boolean) => void; linkValue: string;
+function QuestionCard({ t, names, options: catOptions, remember, setRemember, linkValue, linkOptions, onLink, onAnswer, onSkip }: {
+  t: Transaction; names: Record<string, string>; options: [string, string][]; remember: boolean; setRemember: (v: boolean) => void; linkValue: string;
   linkOptions: { value: string; label: string }[]; onLink: (v: string) => void; onAnswer: (c: TxCategory) => void; onSkip: () => void;
 }) {
   const options = [t.guess || t.cat, ...(t.alts ?? [])].filter((x, i, a): x is TxCategory => !!x && a.indexOf(x) === i).slice(0, 3);
@@ -315,7 +314,7 @@ function QuestionCard({ t, remember, setRemember, linkValue, linkOptions, onLink
         <div className="row" style={{ gap: 8 }}>
           {options.map((c, i) => (
             <button key={c} type="button" className={`chip${i === 0 ? ' suggest' : ''}`} onClick={() => onAnswer(c)}>
-              {TX_CATEGORY_NAMES[c]}{i === 0 && <small>{t.by === 'regel' ? 'bekend' : t.conf ? `suggestie · ${t.conf}%` : ''}</small>}
+              {names[c] ?? c}{i === 0 && <small>{t.by === 'regel' ? 'bekend' : t.conf ? `suggestie · ${t.conf}%` : ''}</small>}
             </button>
           ))}
         </div>
@@ -325,7 +324,7 @@ function QuestionCard({ t, remember, setRemember, linkValue, linkOptions, onLink
           <label htmlFor="q-other">Iets anders?</label>
           <select id="q-other" className="input" value="" onChange={(e) => e.target.value && onAnswer(e.target.value as TxCategory)}>
             <option value="">Kies een andere categorie…</option>
-            {CAT_OPTIONS.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
+            {catOptions.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
           </select>
         </div>
         <div className="field">

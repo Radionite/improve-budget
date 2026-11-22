@@ -1,5 +1,5 @@
 import type { BudgetPct, Situation } from './budget';
-import type { TxCategory } from './categories';
+import type { Category, TxCategory } from './categories';
 
 export type Household = {
   id: string;
@@ -9,7 +9,10 @@ export type Household = {
   inviteCode: string;
   income: number;
   situation: Situation;
-  budget: BudgetPct;
+  budget: BudgetPct; // oud: percentages; alleen nog gebruikt als startwaarde
+  budgetAmounts?: Record<string, number>; // bedrag per categorie per maand (leidend)
+  customCategories?: Category[];
+  hiddenCategories?: string[];
   ownIbans: string[];
   invest?: { start: number; monthly: number; rate: number; years: number; infl: number };
   studyLoan?: { balance: number; rate: number; term: number; extra: number; owner: string };
