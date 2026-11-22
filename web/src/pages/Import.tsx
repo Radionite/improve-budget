@@ -246,26 +246,26 @@ export function ImportPage() {
           <span className="small muted">{monthTx.length} transacties · een wijziging hier telt ook als antwoord</span>
         </div>
         <div className="table-wrap">
-          <table style={{ minWidth: 940 }}>
+          <table className="rtable" style={{ minWidth: 940 }}>
             <thead><tr><th>Datum</th><th>Omschrijving</th><th className="right">Bedrag</th><th>Categorie</th><th>Hoort bij</th><th>Status</th><th><span className="sr-only">Verwijderen</span></th></tr></thead>
             <tbody>
               {monthTx.map((t) => (
                 <tr key={t.id}>
-                  <td className="muted nowrap">{shortDate(t.date)}</td>
+                  <td className="muted nowrap small">{shortDate(t.date)}</td>
                   <td><div className="stack" style={{ gap: 2 }}><span className="strong" style={{ fontWeight: 500 }}>{t.name || t.raw.slice(0, 40)}</span><span className="tiny muted">{t.kind}{t.place ? ` · ${t.place}` : ''}</span></div></td>
-                  <td className="right nowrap" style={{ fontWeight: 600, color: t.amount > 0 ? 'var(--green)' : undefined }}>{signedEuro(t.amount)}</td>
-                  <td>
+                  <td className="right nowrap first" style={{ fontWeight: 600, color: t.amount > 0 ? 'var(--green)' : undefined }}>{signedEuro(t.amount)}</td>
+                  <td className="full">
                     <select className="input" style={{ width: 210, minHeight: 40 }} aria-label={`Categorie voor ${t.name}`} value={t.cat} onChange={(e) => e.target.value && answer(t, e.target.value as TxCategory)}>
                       <option value="">Nog niet ingedeeld</option>
                       {cats.txOptions.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
                     </select>
                   </td>
-                  <td>
+                  <td className="full">
                     <select className="input" style={{ width: 170, minHeight: 40 }} aria-label={`Hoort bij, voor ${t.name}`} value={t.link || ''} onChange={(e) => updateDoc(docRef(hid, 'transactions', t.id), { link: e.target.value })}>
                       {linkOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </td>
-                  <td>{!t.cat ? <span className="pill orange">Wacht op jou</span> : t.by === 'jij' ? <span className="pill green">Door jou</span> : <span className="pill blue">Bekend</span>}</td>
+                  <td className="span2">{!t.cat ? <span className="pill orange">Wacht op jou</span> : t.by === 'jij' ? <span className="pill green">Door jou</span> : <span className="pill blue">Bekend</span>}</td>
                   <td><button className="btn icon" aria-label={`Transactie ${t.name} van ${shortDate(t.date)} verwijderen`} title="Verwijderen" onClick={() => removeTx(t)}><Icon name="x" size={16} /></button></td>
                 </tr>
               ))}

@@ -173,8 +173,8 @@ function CategoryRow({ cat, amount, income, rec, known, onChange, onRemove }: {
   const id = `r-${cat.key}`;
   const share = income ? (amount / income) * 100 : 0;
   return (
-    <li>
-      <div className="stack" style={{ flex: '1 1 220px', gap: 2 }}>
+    <li className="cat-row">
+      <div className="stack cat-name" style={{ flex: '1 1 220px', gap: 2 }}>
         <span className="row" style={{ gap: 8 }}><label htmlFor={id}>{cat.name}</label>{cat.custom && <span className="pill gray">eigen</span>}</span>
         {known ? (
           <span className="tiny muted">
@@ -192,6 +192,7 @@ function CategoryRow({ cat, amount, income, rec, known, onChange, onRemove }: {
           onChange={(v) => income > 0 && onChange(Math.round((income * v) / 100))} style={{ width: 76, textAlign: 'right' }} />
         <span className="muted">%</span>
       </div>
+      <div className="row cat-actions" style={{ gap: 4, flexWrap: 'nowrap' }}>
       <span style={{ width: 112, display: 'inline-flex', justifyContent: 'flex-end' }}>
         {rec === null ? <span className="tiny muted">geen advies</span>
           : Math.abs(share - rec) < 0.5
@@ -199,6 +200,7 @@ function CategoryRow({ cat, amount, income, rec, known, onChange, onRemove }: {
             : <button type="button" className="pill orange" style={{ border: 0, cursor: 'pointer', font: 'inherit', fontSize: 12, fontWeight: 600 }} title={`Advies overnemen: ${euro((income * rec) / 100)}`} onClick={() => onChange(Math.round((income * rec) / 100))}>advies {p(rec)}</button>}
       </span>
       <button type="button" className="btn icon" aria-label={`${cat.name} verwijderen`} title="Categorie verwijderen" onClick={onRemove}><Icon name="x" size={16} /></button>
+      </div>
     </li>
   );
 }

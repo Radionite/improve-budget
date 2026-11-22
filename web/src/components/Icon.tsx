@@ -18,6 +18,7 @@ const PATHS: Record<string, string[]> = {
   download: ['M12 4v12', 'M7 11l5 5 5-5', 'M4 20h16'],
   logout: ['M15 4h4v16h-4', 'M10 8l-4 4 4 4', 'M6 12h10'],
   arrow: ['M5 12h14M13 6l6 6-6 6'],
+  menu: ['M4 6h16', 'M4 12h16', 'M4 18h16'],
 };
 
 export function Icon({ name, size = 20, stroke = 'currentColor' }: { name: keyof typeof PATHS | string; size?: number; stroke?: string }) {

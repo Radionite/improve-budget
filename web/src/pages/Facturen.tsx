@@ -99,23 +99,23 @@ export function FacturenPage() {
             <input className="input" style={{ maxWidth: 240 }} type="search" aria-label="Zoeken" placeholder="Zoek product of winkel" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="table-wrap">
-            <table style={{ minWidth: 760 }}>
+            <table className="rtable" style={{ minWidth: 760 }}>
               <thead><tr><th>Product</th><th>Gekocht</th><th className="right">Bedrag</th><th>Garantie</th><th>Status</th><th><span className="sr-only">Acties</span></th></tr></thead>
               <tbody>
                 {rows.map((i) => {
                   const s = STATUS_STYLE[i.w.status];
                   return (
                     <tr key={i.id}>
-                      <td><div className="stack" style={{ gap: 2 }}><span className="strong">{i.product}</span><span className="small muted">{i.shop}</span></div></td>
-                      <td className="nowrap">{longDate(i.date)}</td>
-                      <td className="right nowrap">{euro(i.amount)}</td>
-                      <td style={{ minWidth: 160 }}>
+                      <td className="span2"><div className="stack" style={{ gap: 2 }}><span className="strong">{i.product}</span><span className="small muted">{i.shop}</span></div></td>
+                      <td className="nowrap full small muted"><span className="hide-lg">Gekocht </span>{longDate(i.date)}</td>
+                      <td className="right nowrap first">{euro(i.amount)}</td>
+                      <td className="full" style={{ minWidth: 160 }}>
                         <div className="stack" style={{ gap: 6 }}>
                           <span className="nowrap">tot {longDate(i.w.untilIso)}</span>
                           <div className="bar" style={{ height: 6 }} aria-hidden="true"><span style={{ width: `${i.w.leftPct}%`, background: s.bar }} /></div>
                         </div>
                       </td>
-                      <td><span className={`pill ${s.pill}`}>{i.w.status === 'binnenkort' ? `Nog ${i.w.days} dagen` : s.label}</span></td>
+                      <td className="span2"><span className={`pill ${s.pill}`}>{i.w.status === 'binnenkort' ? `Nog ${i.w.days} dagen` : s.label}</span></td>
                       <td className="right nowrap">
                         {!!i.fileChunks && <button className="btn" style={{ minHeight: 40 }} onClick={() => open(i)} aria-label={`Bijlage van ${i.product} openen`}><Icon name="file" size={16} />{i.fileType?.startsWith('image/') ? 'Foto' : 'PDF'}</button>}
                         <button className="btn icon" aria-label={`${i.product} verwijderen`} onClick={() => remove(i)}><Icon name="x" size={18} /></button>
