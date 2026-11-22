@@ -89,6 +89,26 @@ export function ImportPage() {
   const openTotal = txs.items.filter((t) => (askAll ? t.by !== 'jij' : !t.cat)).length;
   const current = queue[0];
 
+  // ---------- Verwijderen ----------
+  const removeStatement = async (s: Statement) => {
+    const snap = await getDocs(query(col(hid, 'transactions'), where('statementId', '==', s.id)));
+    const msg = snap.size
+      ? `Afschrift "${s.fileName}" verwijderen, samen met de ${snap.size} transacties die eruit zijn ingelezen?`
+      : `Afschrift "${s.fileName}" uit de lijst verwijderen?`;
+    if (!confirm(msg)) return;
+    for (let i = 0; i < snap.docs.length; i += 400) {
+      const batch = writeBatch(db);
+      snap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+    await deleteDoc(docRef(hid, 'statements', s.id));
+  };
+  const removeTx = async (t: Transaction) => {
+    if (confirm(`Transactie "${t.name || t.raw.slice(0, 40)}" van ${shortDate(t.date)} (${signedEuro(t.amount)}) verwijderen?`)) {
+      await deleteDoc(docRef(hid, 'transactions', t.id));
+    }
+  };
+
   const answer = async (t: Transaction, cat: TxCategory) => {
     const chosenLink = link[t.id] ?? t.link ?? '';
     const batch = writeBatch(db);
@@ -141,7 +161,7 @@ export function ImportPage() {
                   </span>
                 </div>
                 <StatementStatus s={s} />
-                <button className="btn icon" aria-label={`${s.fileName} uit de lijst halen`} onClick={() => deleteDoc(docRef(hid, 'statements', s.id))}><Icon name="x" size={18} /></button>
+                <button className="btn icon" aria-label={`Afschrift ${s.fileName} verwijderen`} title="Afschrift en de ingelezen transacties verwijderen" onClick={() => removeStatement(s)}><Icon name="x" size={18} /></button>
               </li>
             ))}
           </ul>
@@ -227,7 +247,7 @@ export function ImportPage() {
         </div>
         <div className="table-wrap">
           <table style={{ minWidth: 940 }}>
-            <thead><tr><th>Datum</th><th>Omschrijving</th><th className="right">Bedrag</th><th>Categorie</th><th>Hoort bij</th><th>Status</th></tr></thead>
+            <thead><tr><th>Datum</th><th>Omschrijving</th><th className="right">Bedrag</th><th>Categorie</th><th>Hoort bij</th><th>Status</th><th><span className="sr-only">Verwijderen</span></th></tr></thead>
             <tbody>
               {monthTx.map((t) => (
                 <tr key={t.id}>
@@ -246,6 +266,7 @@ export function ImportPage() {
                     </select>
                   </td>
                   <td>{!t.cat ? <span className="pill orange">Wacht op jou</span> : t.by === 'jij' ? <span className="pill green">Door jou</span> : <span className="pill blue">Bekend</span>}</td>
+                  <td><button className="btn icon" aria-label={`Transactie ${t.name} van ${shortDate(t.date)} verwijderen`} title="Verwijderen" onClick={() => removeTx(t)}><Icon name="x" size={16} /></button></td>
                 </tr>
               ))}
             </tbody>

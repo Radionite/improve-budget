@@ -61,7 +61,8 @@ export function BudgetPage() {
     await update({ customCategories: [...(household.customCategories ?? []), { key, name, group }], budgetAmounts: draft, income });
   };
   const removeCategory = async (c: Category) => {
-    if ((draft[c.key] ?? 0) > 0 && !confirm(`${c.name} verwijderen? Het bedrag van ${euro(draft[c.key])} vervalt.`)) return;
+    const amountNote = (draft[c.key] ?? 0) > 0 ? ` Het bedrag van ${euro(draft[c.key])} vervalt.` : '';
+    if (!confirm(`Categorie "${c.name}" verwijderen?${amountNote}`)) return;
     const next = { ...draft };
     delete next[c.key];
     setDraft(next);
@@ -150,17 +151,17 @@ export function BudgetPage() {
       ))}
 
       {cats.hidden.length > 0 && (
-        <section className="card" aria-labelledby="h-hidden">
-          <h2 id="h-hidden" style={{ fontSize: 16 }}>Verborgen categorieën</h2>
-          <div className="row">
+        <details className="small muted">
+          <summary style={{ cursor: 'pointer', minHeight: 32 }}>Verwijderde standaardcategorie terugzetten ({cats.hidden.length})</summary>
+          <div className="row" style={{ marginTop: 10 }}>
             {cats.hidden.map((c) => <button key={c.key} type="button" className="btn" onClick={() => showCategory(c.key)}><Icon name="plus" size={16} />{c.name}</button>)}
           </div>
-        </section>
+        </details>
       )}
 
       <p className="small muted" style={{ maxWidth: 780 }}>
         Vul per categorie een bedrag of een percentage in; het bedrag wordt bewaard. Het advies is een vertrekpunt op basis van je gezinssituatie,
-        geen officieel advies. Eigen categorieën hebben geen advies.
+        geen officieel advies. Eigen categorieën hebben geen advies. Een verwijderde categorie verdwijnt ook uit de bankimport.
       </p>
     </>
   );
@@ -197,7 +198,7 @@ function CategoryRow({ cat, amount, income, rec, known, onChange, onRemove }: {
             ? <span className="pill green"><Icon name="check" size={12} />advies</span>
             : <button type="button" className="pill orange" style={{ border: 0, cursor: 'pointer', font: 'inherit', fontSize: 12, fontWeight: 600 }} title={`Advies overnemen: ${euro((income * rec) / 100)}`} onClick={() => onChange(Math.round((income * rec) / 100))}>advies {p(rec)}</button>}
       </span>
-      <button type="button" className="btn icon" aria-label={cat.custom ? `${cat.name} verwijderen` : `${cat.name} verbergen`} title={cat.custom ? 'Verwijderen' : 'Verbergen'} onClick={onRemove}><Icon name="x" size={16} /></button>
+      <button type="button" className="btn icon" aria-label={`${cat.name} verwijderen`} title="Categorie verwijderen" onClick={onRemove}><Icon name="x" size={16} /></button>
     </li>
   );
 }
