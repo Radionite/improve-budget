@@ -89,8 +89,6 @@ In de repository: *Settings → Secrets and variables → Actions*.
 | Secret | `FIREBASE_PROJECT_ID` | je project-id |
 | Secret | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_APP_ID` | uit de web-app config |
 | Secret | `BACKUP_PASSWORD` | een lang wachtwoord; bewaar het ook in je wachtwoordmanager |
-| Variable | `DEPLOY_ENABLED` | `true` → elke push naar `main` gaat live |
-| Variable | `BACKUP_ENABLED` | `true` → elke nacht een back-up |
 
 ## 4. Back-ups
 

@@ -2,7 +2,7 @@ name: Back-up
 
 # Elke nacht een versleutelde back-up van de hele database (inclusief facturen en foto's).
 # De back-up staat 90 dagen als 'artifact' bij de workflow-run (alleen zichtbaar voor jou).
-# Benodigd: secrets FIREBASE_SERVICE_ACCOUNT en BACKUP_PASSWORD, variable BACKUP_ENABLED = true.
+# Benodigd: secrets FIREBASE_SERVICE_ACCOUNT en BACKUP_PASSWORD. Zonder die secrets wordt er niets gedaan.
 # Terugzetten: zie README.
 
 on:
@@ -13,26 +13,39 @@ on:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    if: ${{ vars.BACKUP_ENABLED == 'true' }}
     steps:
+      - name: Instellingen controleren
+        id: check
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PW: ${{ secrets.BACKUP_PASSWORD }}
+        run: |
+          if [ -n "$SA" ] && [ -n "$PW" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"
+          else echo "::warning::Geen back-up: FIREBASE_SERVICE_ACCOUNT en/of BACKUP_PASSWORD ontbreken."; fi
+
       - uses: actions/checkout@v4
+        if: steps.check.outputs.ok == 'true'
 
       - uses: actions/setup-node@v4
+        if: steps.check.outputs.ok == 'true'
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: scripts/package-lock.json
 
       - run: npm ci
+        if: steps.check.outputs.ok == 'true'
         working-directory: scripts
 
       - name: Database exporteren
+        if: steps.check.outputs.ok == 'true'
         working-directory: scripts
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: node backup.mjs "$RUNNER_TEMP/backup.json"
 
       - name: Versleutelen
+        if: steps.check.outputs.ok == 'true'
         env:
           BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
         run: |
@@ -45,6 +58,7 @@ jobs:
           rm -f "$RUNNER_TEMP/backup.json.gz"
 
       - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.ok == 'true'
         with:
           name: gezinsbank-backup-${{ github.run_id }}
           path: ${{ runner.temp }}/gezinsbank-backup-*.json.gz.enc

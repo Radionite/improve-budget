@@ -5,7 +5,6 @@ name: Deploy naar Firebase
 # Benodigd (Settings > Secrets and variables > Actions), zie README:
 #   secrets: FIREBASE_SERVICE_ACCOUNT, FIREBASE_PROJECT_ID,
 #            VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_APP_ID
-#   variable: DEPLOY_ENABLED = true
 
 on:
   push:
@@ -19,8 +18,25 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
     steps:
+      - name: Instellingen controleren
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          APPID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: |
+          missing=""
+          [ -n "$SA" ] || missing="$missing FIREBASE_SERVICE_ACCOUNT"
+          [ -n "$PID" ] || missing="$missing FIREBASE_PROJECT_ID"
+          [ -n "$KEY" ] || missing="$missing VITE_FIREBASE_API_KEY"
+          [ -n "$DOMAIN" ] || missing="$missing VITE_FIREBASE_AUTH_DOMAIN"
+          [ -n "$APPID" ] || missing="$missing VITE_FIREBASE_APP_ID"
+          if [ -n "$missing" ]; then echo "::error::Deze secrets ontbreken:$missing"; exit 1; fi
+          echo "$SA" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d.get('type')=='service_account' and d.get('private_key')" \
+            || { echo "::error::FIREBASE_SERVICE_ACCOUNT is geen geldige JSON-sleutel van een service-account"; exit 1; }
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
