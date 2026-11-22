@@ -2,9 +2,9 @@ name: Deploy naar Firebase
 
 # Zet de app live bij elke push naar main (of handmatig via "Run workflow").
 # Werkt op het gratis Spark-abonnement: alleen Hosting en de Firestore-regels.
-# Benodigd (Settings > Secrets and variables > Actions), zie README:
-#   secrets: FIREBASE_SERVICE_ACCOUNT, FIREBASE_PROJECT_ID,
-#            VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_APP_ID
+# Benodigde secrets (Settings > Secrets and variables > Actions), zie README:
+#   FIREBASE_SERVICE_ACCOUNT, VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_APP_ID
+# De project-id wordt uit de service-account-sleutel gehaald.
 
 on:
   push:
@@ -20,22 +20,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Instellingen controleren
+        id: cfg
         env:
           SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          PID: ${{ secrets.FIREBASE_PROJECT_ID }}
           KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           APPID: ${{ secrets.VITE_FIREBASE_APP_ID }}
         run: |
           missing=""
           [ -n "$SA" ] || missing="$missing FIREBASE_SERVICE_ACCOUNT"
-          [ -n "$PID" ] || missing="$missing FIREBASE_PROJECT_ID"
           [ -n "$KEY" ] || missing="$missing VITE_FIREBASE_API_KEY"
           [ -n "$DOMAIN" ] || missing="$missing VITE_FIREBASE_AUTH_DOMAIN"
           [ -n "$APPID" ] || missing="$missing VITE_FIREBASE_APP_ID"
           if [ -n "$missing" ]; then echo "::error::Deze secrets ontbreken:$missing"; exit 1; fi
-          echo "$SA" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d.get('type')=='service_account' and d.get('private_key')" \
-            || { echo "::error::FIREBASE_SERVICE_ACCOUNT is geen geldige JSON-sleutel van een service-account"; exit 1; }
+          PROJECT=$(printf '%s' "$SA" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d.get('type')=='service_account' and d.get('private_key'); print(d['project_id'])") \
+            || { echo "::error::FIREBASE_SERVICE_ACCOUNT is geen geldige JSON-sleutel van een service-account. Plak de volledige inhoud van het .json-bestand."; exit 1; }
+          case "$KEY" in AIza*) ;; *) echo "::error::VITE_FIREBASE_API_KEY lijkt niet te kloppen (hij begint normaal met AIza)."; exit 1;; esac
+          case "$DOMAIN" in *.firebaseapp.com|*.web.app) ;; *) echo "::error::VITE_FIREBASE_AUTH_DOMAIN moet eindigen op .firebaseapp.com"; exit 1;; esac
+          case "$APPID" in 1:*:web:*) ;; *) echo "::error::VITE_FIREBASE_APP_ID moet beginnen met 1: en :web: bevatten"; exit 1;; esac
+          echo "Project: $PROJECT"
+          echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
 
@@ -50,7 +54,7 @@ jobs:
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_PROJECT_ID: ${{ steps.cfg.outputs.project }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
         run: |
           npm ci
@@ -65,7 +69,15 @@ jobs:
       - name: Deploy
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
-        run: npx --yes firebase-tools@13 deploy --project "${{ secrets.FIREBASE_PROJECT_ID }}" --only hosting,firestore:rules --non-interactive
+          PROJECT: ${{ steps.cfg.outputs.project }}
+        run: npx --yes firebase-tools@13 deploy --project "$PROJECT" --only hosting,firestore:rules --non-interactive
+
+      - name: Foutmelding van Firebase tonen
+        if: failure()
+        run: |
+          if [ -f firebase-debug.log ]; then
+            grep -vi "private_key\|Bearer\|access_token" firebase-debug.log | tail -60
+          fi
 
       - name: Opruimen
         if: always()

@@ -86,7 +86,6 @@ In de repository: *Settings → Secrets and variables → Actions*.
 | Soort | Naam | Waarde |
 |---|---|---|
 | Secret | `FIREBASE_SERVICE_ACCOUNT` | de volledige inhoud van de JSON-sleutel |
-| Secret | `FIREBASE_PROJECT_ID` | je project-id |
 | Secret | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_APP_ID` | uit de web-app config |
 | Secret | `BACKUP_PASSWORD` | een lang wachtwoord; bewaar het ook in je wachtwoordmanager |
 
