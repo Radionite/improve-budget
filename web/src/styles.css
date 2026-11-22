@@ -182,7 +182,6 @@ th:last-child, td:last-child { padding-right: 0; }
   .rtable select.input { width: 100% !important; }
   .rtable .hide-sm { display: none; }
 }
-}
 
 .center-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
 .auth-card { width: min(420px, 100%); }
