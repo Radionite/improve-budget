@@ -4,7 +4,8 @@ import { Icon } from '../components/Icon';
 import { byDateDesc, recentOnly, useCollection, useData } from '../lib/data';
 import { useCommitments } from '../lib/commitments';
 import { GROUPS } from '../lib/categories';
-import { budgetAmounts, useCategories } from '../lib/useCategories';
+import { useCategories } from '../lib/useCategories';
+import { useBudgetAmounts } from '../lib/useBudget';
 import { euro, longDate, monthLabel, pct } from '../lib/format';
 import { warrantyInfo } from './Facturen';
 import type { Invoice, Transaction } from '../lib/types';
@@ -15,10 +16,11 @@ export function OverzichtPage() {
   const invoices = useCollection<Invoice>('invoices');
   const txs = useCollection<Transaction>('transactions', recentOnly, byDateDesc);
   const cats = useCategories();
+  const { amounts: budgetNow } = useBudgetAmounts();
   if (!household) return null;
 
   const income = household.income || 0;
-  const amounts = budgetAmounts(household);
+  const amounts = budgetNow;
   const groups = cats.groupSums(amounts);
   const planned = GROUPS.reduce((s, g) => s + groups[g.id], 0);
   const lastMonth = txs.items[0]?.month;

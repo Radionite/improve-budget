@@ -5,7 +5,8 @@ import { byDateDesc, recentOnly, useCollection, useData } from '../lib/data';
 import { useCommitments, WEEKS_PER_MONTH } from '../lib/commitments';
 import { GROUPS } from '../lib/categories';
 import { annuity, futureValue, recommend, simulateLoan, situationName, type Situation } from '../lib/budget';
-import { budgetAmounts, useCategories } from '../lib/useCategories';
+import { useCategories } from '../lib/useCategories';
+import { useBudgetAmounts } from '../lib/useBudget';
 import { euro, euroCents, longDate, monthLabel, pct } from '../lib/format';
 import type { ReportSection } from '../lib/report';
 import type { Invoice, Transaction } from '../lib/types';
@@ -22,6 +23,7 @@ export function RapportPage() {
   const { household } = useData();
   const { monthly, derived, people, pets, vehicles, loans, studyPayment } = useCommitments();
   const cats = useCategories();
+  const { amounts: budgetNow } = useBudgetAmounts();
   const invoices = useCollection<Invoice>('invoices', byDateDesc);
   const txs = useCollection<Transaction>('transactions', recentOnly, byDateDesc);
   const months = useMemo(() => [...new Set(txs.items.map((t) => t.month))].sort().reverse(), [txs.items]);
@@ -37,7 +39,7 @@ export function RapportPage() {
   const share = (n: number) => (income ? (n / income) * 100 : 0);
 
   const buildSections = (): ReportSection[] => {
-    const amounts = budgetAmounts(household);
+    const amounts = budgetNow;
     const situation: Situation = derived ?? household.situation ?? { adults: 2, kids: 0, pets: false, cars: 0 };
     const rec = recommend(situation, {
       studieschuld: income ? ((monthly.studieschuld ?? 0) / income) * 100 : 0,

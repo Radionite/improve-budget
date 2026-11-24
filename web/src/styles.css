@@ -224,3 +224,5 @@ th:last-child, td:last-child { padding-right: 0; }
   .income-row .income-del { grid-area: del; }
   .income-row .input { width: 100% !important; min-width: 0; }
 }
+
+.budget-link { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px; background: var(--inset); border: 1px solid var(--line); }

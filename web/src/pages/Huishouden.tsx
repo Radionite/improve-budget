@@ -2,6 +2,7 @@ import { addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { PageHead } from '../components/Layout';
 import { NumberField, SelectField, TextField } from '../components/Fields';
 import { Icon } from '../components/Icon';
+import { BudgetLink } from '../components/BudgetLink';
 import { col, docRef, useData } from '../lib/data';
 import { useCommitments, WEEKS_PER_MONTH } from '../lib/commitments';
 import { daysUntil, euro, euroCents, pct } from '../lib/format';
@@ -60,6 +61,7 @@ export function HuishoudenPage() {
             <button className="btn" onClick={() => addDoc(col(hid, 'people'), { name: 'Kind', role: 'child', age: 6, zakgeld: 0, kleedgeld: 0, studySaved: 0, studyMonthly: 0, studyGoal: 0, studyMode: 'sparen' })}><Icon name="plus" size={16} />Kind</button>
           </div>
         </div>
+        <BudgetLink keys={['zakouders', 'zakkind', 'kleding']} />
         <ul className="cards">
           {people.map((p) => <PersonCard key={p.id} p={p} save={save('people', p.id)} remove={() => remove('people', p.id, p.name)} />)}
         </ul>
@@ -72,6 +74,7 @@ export function HuishoudenPage() {
           <div className="stack" style={{ gap: 4 }}><h2 id="h-dieren">Huisdieren</h2><span className="small muted">Voer, dierenarts en verzekering per maand</span></div>
           <button className="btn" onClick={() => addDoc(col(hid, 'pets'), { name: 'Nieuw huisdier', kind: 'Kat', cost: 0 })}><Icon name="plus" size={16} />Huisdier</button>
         </div>
+        <BudgetLink keys={['dieren']} />
         <ul className="cards">
           {pets.map((p) => (
             <li key={p.id} className="card inset">
@@ -94,6 +97,7 @@ export function HuishoudenPage() {
           <div className="stack" style={{ gap: 4 }}><h2 id="h-voertuigen">Voertuigen</h2><span className="small muted">Vaste en variabele kosten per maand · APK-herinnering</span></div>
           <button className="btn" onClick={() => addDoc(col(hid, 'vehicles'), { name: 'Gezinsauto', kind: 'Auto', fuel: 'Benzine', tax: 0, insurance: 0, energy: 0, maintenance: 0, apk: '' })}><Icon name="plus" size={16} />Voertuig</button>
         </div>
+        <BudgetLink keys={['vervoer']} />
         <ul className="cards" style={{ '--min': '340px' } as React.CSSProperties}>
           {vehicles.map((v) => <VehicleCard key={v.id} v={v} save={save('vehicles', v.id)} remove={() => remove('vehicles', v.id, v.name)} />)}
         </ul>

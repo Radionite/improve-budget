@@ -3,6 +3,7 @@ import { addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { PageHead } from '../components/Layout';
 import { NumberField, Segmented, Slider } from '../components/Fields';
 import { Icon } from '../components/Icon';
+import { BudgetLink } from '../components/BudgetLink';
 import { col, docRef, useData } from '../lib/data';
 import { useCommitments } from '../lib/commitments';
 import { annuity, futureValue, neededMonthly, simulateLoan } from '../lib/budget';
@@ -62,6 +63,7 @@ export function LeningenPage() {
             <Segmented label="Aflossingsregeling" value={sl.term} options={[{ value: 35, label: '35 jaar (vanaf 2015)' }, { value: 15, label: '15 jaar (voor 2015)' }]} onChange={(v) => set('term')(v)} />
           </div>
         </div>
+        <BudgetLink keys={['studieschuld']} />
         <div className="split">
           <div className="narrow stack" style={{ gap: 18 }}>
             <Slider label="Openstaande schuld" value={sl.balance} display={euro(sl.balance)} min={0} max={100000} step={500} onChange={set('balance')} minLabel="€ 0" maxLabel="€ 100k" />
@@ -96,6 +98,7 @@ export function LeningenPage() {
 
       <section className="card" aria-labelledby="h-loans">
         <h2 id="h-loans">Andere leningen</h2>
+        <BudgetLink keys={['wonen', 'lening']} />
         <ul className="list">
           {loans.map((l) => (
             <li key={l.id}>
@@ -127,6 +130,7 @@ export function LeningenPage() {
           <h2 id="h-kids" style={{ fontSize: 22 }}>Spaarplan studie kinderen</h2>
           <span className="small muted">Per kind een potje tot de start van de studie (18 jaar). In je budget is dit de post Studiesparen kinderen.</span>
         </div>
+        <BudgetLink keys={['studiekind']} />
         <div className="grid" style={{ '--min': '340px' } as React.CSSProperties}>
           {kids.map((k) => <KidPlan key={k.id} k={k} save={(patch) => updateDoc(docRef(hid, 'people', k.id), patch)} />)}
         </div>

@@ -7,7 +7,8 @@ import { Icon } from '../components/Icon';
 import { byDateDesc, col, docRef, recentOnly, useCollection, useData } from '../lib/data';
 import { useLinkOptions } from '../lib/commitments';
 import { GROUPS, type TxCategory } from '../lib/categories';
-import { budgetAmounts, useCategories } from '../lib/useCategories';
+import { useCategories } from '../lib/useCategories';
+import { useBudgetAmounts } from '../lib/useBudget';
 import { euro, longDate, monthLabel, shortDate, signedEuro } from '../lib/format';
 import type { Rule, Statement, Transaction } from '../lib/types';
 
@@ -20,6 +21,7 @@ export function ImportPage() {
   const rules = useCollection<Rule>('rules');
   const linkOptions = useLinkOptions();
   const cats = useCategories();
+  const { amounts: budgetNow } = useBudgetAmounts();
 
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState('');
@@ -131,7 +133,7 @@ export function ImportPage() {
 
   // ---------- Overzicht van de maand ----------
   const monthTx = txs.items.filter((t) => t.month === activeMonth);
-  const budgetPer = cats.groupSums(budgetAmounts(household));
+  const budgetPer = cats.groupSums(budgetNow);
   const spentPer = (g: string) => monthTx.filter((t) => t.amount < 0 && cats.groupOf(t.cat) === g).reduce((s, t) => s - t.amount, 0);
   const incomeIn = monthTx.filter((t) => t.amount > 0 && t.cat === 'inkomen').reduce((s, t) => s + t.amount, 0);
 

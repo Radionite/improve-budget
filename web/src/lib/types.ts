@@ -14,6 +14,8 @@ export type Household = {
   budgetAmounts?: Record<string, number>; // bedrag per categorie per maand (leidend)
   customCategories?: Category[];
   hiddenCategories?: string[];
+  /** Categorieën die de gebruiker zelf invult in plaats van automatisch uit Huishouden/Leningen. */
+  unlinkedCategories?: string[];
   incomeSources?: IncomeSource[];
   ownIbans: string[];
   invest?: { start: number; monthly: number; rate: number; years: number; infl: number };

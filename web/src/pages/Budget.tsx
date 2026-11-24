@@ -7,10 +7,13 @@ import { useData } from '../lib/data';
 import { useCommitments } from '../lib/commitments';
 import { GROUPS, type Category, type GroupId } from '../lib/categories';
 import { recommend, situationName, type Situation } from '../lib/budget';
-import { budgetAmounts, useCategories } from '../lib/useCategories';
+import { useCategories } from '../lib/useCategories';
+import { useBudgetAmounts } from '../lib/useBudget';
 import { budgetIncome, incomeSources, type IncomeSource } from '../lib/income';
 import { IncomeCard } from '../components/IncomeCard';
 import { euro, pct } from '../lib/format';
+
+const LINK_SOURCE: Record<string, string> = { studieschuld: 'Studie & leningen', wonen: 'Studie & leningen', lening: 'Studie & leningen', studiekind: 'Studie & leningen' };
 
 /** Percentage tonen: hele getallen zonder decimaal, anders 1 decimaal. */
 const p = (n: number) => pct(n, Math.abs(n - Math.round(n)) < 0.05 ? 0 : 1);
@@ -21,7 +24,7 @@ export function BudgetPage() {
   const { household, update } = useData();
   const { monthly, derived } = useCommitments();
   const cats = useCategories();
-  const stored = useMemo(() => budgetAmounts(household), [household]);
+  const { amounts: stored, linked } = useBudgetAmounts();
   const [draft, setDraft] = useState<Record<string, number>>(stored);
   const storedSources = useMemo(() => incomeSources(household), [household]);
   const [sources, setSources] = useState<IncomeSource[]>(storedSources);
@@ -47,7 +50,16 @@ export function BudgetPage() {
   cats.visible.forEach((c) => { if (!c.custom) recGroups[c.group] += rec[c.key] ?? 0; });
   const dirty = JSON.stringify(draft) !== JSON.stringify(stored) || JSON.stringify(sources) !== JSON.stringify(storedSources);
 
-  const setAmount = (key: string, v: number) => setDraft({ ...draft, [key]: cents(Math.max(0, v)) });
+  const setAmount = (key: string, v: number) => {
+    const next = { ...draft, [key]: cents(Math.max(0, v)) };
+    setDraft(next);
+    // Zelf een bedrag invullen bij een gekoppelde categorie: koppeling loslaten en meteen bewaren.
+    if (linked.has(key) && Math.abs(next[key] - (stored[key] ?? 0)) >= 0.5) {
+      update({ unlinkedCategories: [...(household.unlinkedCategories ?? []), key], budgetAmounts: next, income, incomeSources: sources });
+    }
+  };
+  const relink = (key: string) =>
+    update({ unlinkedCategories: (household.unlinkedCategories ?? []).filter((k) => k !== key), budgetAmounts: draft, income, incomeSources: sources });
   const save = async () => {
     await update({ budgetAmounts: draft, income, incomeSources: sources });
     setSaved(true);
@@ -149,8 +161,8 @@ export function BudgetPage() {
           </div>
           <ul className="list">
             {cats.visible.filter((c) => c.group === g.id).map((c) => (
-              <CategoryRow key={c.key} cat={c} amount={draft[c.key] ?? 0} income={income} rec={c.custom ? null : rec[c.key] ?? 0} known={(monthly as Record<string, number | undefined>)[c.key]}
-                onChange={(v) => setAmount(c.key, v)} onRemove={() => removeCategory(c)} />
+              <CategoryRow key={c.key} cat={c} amount={draft[c.key] ?? 0} income={income} rec={c.custom ? null : rec[c.key] ?? 0} known={(monthly as Record<string, number | undefined>)[c.key]} linked={linked.has(c.key)}
+                onChange={(v) => setAmount(c.key, v)} onRelink={() => relink(c.key)} onRemove={() => removeCategory(c)} />
             ))}
           </ul>
           <AddCategory onAdd={(name) => addCategory(g.id, name)} />
@@ -174,8 +186,8 @@ export function BudgetPage() {
   );
 }
 
-function CategoryRow({ cat, amount, income, rec, known, onChange, onRemove }: {
-  cat: Category; amount: number; income: number; rec: number | null; known?: number; onChange: (v: number) => void; onRemove: () => void;
+function CategoryRow({ cat, amount, income, rec, known, linked, onChange, onRelink, onRemove }: {
+  cat: Category; amount: number; income: number; rec: number | null; known?: number; linked: boolean; onChange: (v: number) => void; onRelink: () => void; onRemove: () => void;
 }) {
   const id = `r-${cat.key}`;
   const share = income ? (amount / income) * 100 : 0;
@@ -183,10 +195,14 @@ function CategoryRow({ cat, amount, income, rec, known, onChange, onRemove }: {
     <li className="cat-row">
       <div className="stack cat-name" style={{ flex: '1 1 220px', gap: 2 }}>
         <span className="row" style={{ gap: 8 }}><label htmlFor={id}>{cat.name}</label>{cat.custom && <span className="pill gray">eigen</span>}</span>
-        {known ? (
+        {linked ? (
+          <span className="tiny" style={{ color: 'var(--green)' }} title="Wordt automatisch bijgewerkt. Vul zelf een bedrag in om de koppeling los te laten.">
+            <Icon name="check" size={12} /> Automatisch uit {LINK_SOURCE[cat.key] ?? 'Huishouden'}
+          </span>
+        ) : known ? (
           <span className="tiny muted">
-            Vastgelegd: {euro(known)} per maand
-            {Math.abs(known - amount) >= 0.5 && <button type="button" className="btn ghost tiny" style={{ minHeight: 28, padding: '0 6px' }} onClick={() => onChange(Math.round(known))}>overnemen</button>}
+            Vastgelegd: {euro(known)} per maand · zelf ingevuld
+            <button type="button" className="btn ghost tiny" style={{ minHeight: 28, padding: '0 6px' }} onClick={onRelink}>weer koppelen</button>
           </span>
         ) : null}
       </div>
