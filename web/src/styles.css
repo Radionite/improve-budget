@@ -201,3 +201,26 @@ th:last-child, td:last-child { padding-right: 0; }
   .nav a { font-size: 14px; gap: 10px; }
   .main { padding: 32px 24px 48px; }
 }
+
+/* Inkomsten */
+.income-row .income-name { flex: 1 1 180px; }
+.income-extra { display: flex; flex-direction: column; align-items: flex-end; gap: 0; min-width: 120px; }
+.months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; }
+.month { display: flex; flex-direction: column; gap: 2px; padding: 8px; border-radius: 10px; background: var(--inset); border: 1px solid var(--line); min-width: 0; }
+.month.has { background: var(--green-bg); border-color: #245B3D; }
+.month.has strong { color: var(--green); }
+.month.now { outline: 1.5px solid var(--link); }
+@media (max-width: 1024px) {
+  .months { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .months { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .income-row { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; grid-template-areas: "name name del" "amt freq freq" "when extra extra"; gap: 8px !important; align-items: center; }
+  .income-row .income-name { grid-area: name; }
+  .income-row .income-amt { grid-area: amt; min-width: 0; }
+  .income-row .income-freq { grid-area: freq; }
+  .income-row .income-when { grid-area: when; }
+  .income-row .income-extra { grid-area: extra; align-items: flex-end; min-width: 0; }
+  .income-row .income-del { grid-area: del; }
+  .income-row .input { width: 100% !important; min-width: 0; }
+}

@@ -41,7 +41,7 @@ export function OverzichtPage() {
       {open > 0 && <p className="notice orange">Er {open === 1 ? 'is 1 transactie' : `zijn ${open} transacties`} nog niet ingedeeld. <Link to="/bankimport">Beantwoord de vragen</Link>.</p>}
 
       <section className="grid" aria-label="Kerncijfers">
-        <div className="card kpi"><span className="label">Netto gezinsinkomen per maand</span><span className="value">{euro(income)}</span><span className="sub">{income ? pct((planned / income) * 100) : '0%'} verdeeld</span></div>
+        <div className="card kpi"><span className="label">Inkomen per maand</span><span className="value">{euro(income)}</span><span className="sub">{income ? pct((planned / income) * 100) : '0%'} verdeeld</span></div>
         <div className="card kpi"><span className="label">Sparen & beleggen per maand</span><span className="value">{euro(groups.sparen)}</span><span className="sub">{income ? pct((groups.sparen / income) * 100) : '0%'} van je inkomen</span></div>
         <div className="card kpi"><span className="label">Actieve garanties</span><span className="value">{active} <span className="small muted">van {invoices.items.length}</span></span><span className="sub" style={soon.length ? { color: 'var(--orange-text)' } : undefined}>{soon.length} verlopen binnen 90 dagen</span></div>
         <Link to="/leningen" className="card kpi" style={{ textDecoration: 'none', color: 'inherit' }}><span className="label">Leningen</span><span className="value">{euro(debt)}</span><span className="sub">{euro(loanMonthly)} per maand</span></Link>

@@ -1,3 +1,4 @@
+import type { IncomeSource } from './income';
 import type { BudgetPct, Situation } from './budget';
 import type { Category, TxCategory } from './categories';
 
@@ -13,6 +14,7 @@ export type Household = {
   budgetAmounts?: Record<string, number>; // bedrag per categorie per maand (leidend)
   customCategories?: Category[];
   hiddenCategories?: string[];
+  incomeSources?: IncomeSource[];
   ownIbans: string[];
   invest?: { start: number; monthly: number; rate: number; years: number; infl: number };
   studyLoan?: { balance: number; rate: number; term: number; extra: number; owner: string };

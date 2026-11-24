@@ -10,6 +10,7 @@ import { euro, euroCents, longDate, monthLabel, pct } from '../lib/format';
 import type { ReportSection } from '../lib/report';
 import type { Invoice, Transaction } from '../lib/types';
 import { warrantyInfo } from './Facturen';
+import { budgetIncome, extrasPerYear, FREQ_LABEL, incomeSources, MONTHS, paidMonths, perMonth } from '../lib/income';
 
 const STUDY_RATES = { sparen: 1.5, beleggen: 5 };
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -55,7 +56,7 @@ export function RapportPage() {
       title: 'Samenvatting',
       facts: [
         ['Situatie', situationName(situation)],
-        ['Netto gezinsinkomen per maand', euro(income)],
+        ['Inkomen per maand (voor het budget)', euro(income)],
         ['Begroot per maand', `${euro(planned)} (${p1(share(planned))})`],
         [income - planned >= 0 ? 'Nog te verdelen' : 'Te veel begroot', euro(Math.abs(income - planned))],
         ...GROUPS.map((g) => [g.name, `${euro(groupSums[g.id])} (${p1(share(groupSums[g.id]))})`] as [string, string]),
@@ -64,6 +65,22 @@ export function RapportPage() {
         ['Garanties', `${inv.filter((i) => i.w.status !== 'verlopen').length} actief, ${inv.filter((i) => i.w.status === 'binnenkort').length} verlopen binnen 90 dagen`],
       ],
     });
+
+    // 1b. Inkomsten
+    const src = incomeSources(household);
+    if (src.length) {
+      sections.push({
+        title: 'Inkomsten',
+        note: extrasPerYear(src) > 0 ? `Extra's die niet in het maandbudget zitten: ${euro(extrasPerYear(src))} per jaar.` : undefined,
+        tables: [{
+          head: ['Inkomen', 'Bedrag', 'Hoe vaak', 'Wanneer', 'Gem. per maand', 'In maandbudget'],
+          body: src.map((x) => [x.name, euro(x.amount), FREQ_LABEL[x.freq].toLowerCase(), x.freq === 'maand' ? 'elke maand' : paidMonths(x).map((m) => MONTHS[m - 1]).join(', '),
+            euro(perMonth(x)), x.freq === 'maand' || x.spread ? 'ja' : 'nee, apart']),
+          foot: ['Voor het maandbudget', '', '', '', euro(budgetIncome(src)), ''],
+          right: [1, 4],
+        }],
+      });
+    }
 
     // 2. Budget per categorie
     sections.push({

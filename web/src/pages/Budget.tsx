@@ -8,6 +8,8 @@ import { useCommitments } from '../lib/commitments';
 import { GROUPS, type Category, type GroupId } from '../lib/categories';
 import { recommend, situationName, type Situation } from '../lib/budget';
 import { budgetAmounts, useCategories } from '../lib/useCategories';
+import { budgetIncome, incomeSources, type IncomeSource } from '../lib/income';
+import { IncomeCard } from '../components/IncomeCard';
 import { euro, pct } from '../lib/format';
 
 /** Percentage tonen: hele getallen zonder decimaal, anders 1 decimaal. */
@@ -21,11 +23,13 @@ export function BudgetPage() {
   const cats = useCategories();
   const stored = useMemo(() => budgetAmounts(household), [household]);
   const [draft, setDraft] = useState<Record<string, number>>(stored);
-  const [income, setIncome] = useState(household?.income ?? 0);
+  const storedSources = useMemo(() => incomeSources(household), [household]);
+  const [sources, setSources] = useState<IncomeSource[]>(storedSources);
+  const income = budgetIncome(sources);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => { setDraft(stored); }, [stored]);
-  useEffect(() => { setIncome(household?.income ?? 0); }, [household?.income]);
+  useEffect(() => { setSources(storedSources); }, [storedSources]);
 
   const situation: Situation = derived ?? household?.situation ?? { adults: 2, kids: 0, pets: false, cars: 0 };
   const rec = useMemo(() => recommend(situation, {
@@ -41,11 +45,11 @@ export function BudgetPage() {
   const groups = cats.groupSums(draft);
   const recGroups: Record<GroupId, number> = { vast: 0, leven: 0, sparen: 0 };
   cats.visible.forEach((c) => { if (!c.custom) recGroups[c.group] += rec[c.key] ?? 0; });
-  const dirty = JSON.stringify(draft) !== JSON.stringify(stored) || income !== household.income;
+  const dirty = JSON.stringify(draft) !== JSON.stringify(stored) || JSON.stringify(sources) !== JSON.stringify(storedSources);
 
   const setAmount = (key: string, v: number) => setDraft({ ...draft, [key]: cents(Math.max(0, v)) });
   const save = async () => {
-    await update({ budgetAmounts: draft, income });
+    await update({ budgetAmounts: draft, income, incomeSources: sources });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -58,7 +62,7 @@ export function BudgetPage() {
 
   const addCategory = async (group: GroupId, name: string) => {
     const key = `c_${Math.random().toString(36).slice(2, 8)}`;
-    await update({ customCategories: [...(household.customCategories ?? []), { key, name, group }], budgetAmounts: draft, income });
+    await update({ customCategories: [...(household.customCategories ?? []), { key, name, group }], budgetAmounts: draft, income, incomeSources: sources });
   };
   const removeCategory = async (c: Category) => {
     const amountNote = (draft[c.key] ?? 0) > 0 ? ` Het bedrag van ${euro(draft[c.key])} vervalt.` : '';
@@ -67,12 +71,12 @@ export function BudgetPage() {
     delete next[c.key];
     setDraft(next);
     if (c.custom) {
-      await update({ customCategories: (household.customCategories ?? []).filter((x) => x.key !== c.key), budgetAmounts: next, income });
+      await update({ customCategories: (household.customCategories ?? []).filter((x) => x.key !== c.key), budgetAmounts: next, income, incomeSources: sources });
     } else {
-      await update({ hiddenCategories: [...(household.hiddenCategories ?? []), c.key], budgetAmounts: next, income });
+      await update({ hiddenCategories: [...(household.hiddenCategories ?? []), c.key], budgetAmounts: next, income, incomeSources: sources });
     }
   };
-  const showCategory = (key: string) => update({ hiddenCategories: (household.hiddenCategories ?? []).filter((k) => k !== key), budgetAmounts: draft, income });
+  const showCategory = (key: string) => update({ hiddenCategories: (household.hiddenCategories ?? []).filter((k) => k !== key), budgetAmounts: draft, income, incomeSources: sources });
 
   return (
     <>
@@ -101,11 +105,14 @@ export function BudgetPage() {
         )}
       </section>
 
+      <IncomeCard sources={sources} onChange={setSources} />
+
       <section className="card" aria-label="Inkomen en verdeling">
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
-          <div className="field" style={{ width: 240 }}>
-            <label htmlFor="inc">Netto gezinsinkomen per maand (€)</label>
-            <NumberInput id="inc" value={income} min={0} step={50} onChange={(v) => setIncome(cents(v))} style={{ fontSize: 22, fontWeight: 600 }} />
+          <div className="stack" style={{ gap: 4 }}>
+            <span className="small muted">Te verdelen per maand</span>
+            <span className="display strong" style={{ fontSize: 28 }}>{euro(income)}</span>
+            <a href="#h-inkomsten" className="tiny">Inkomsten aanpassen</a>
           </div>
           <div className="stack" style={{ alignItems: 'flex-end' }}>
             <span className="small muted">Verdeeld</span>
