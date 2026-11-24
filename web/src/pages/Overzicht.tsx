@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { PageHead } from '../components/Layout';
+import { Icon } from '../components/Icon';
 import { byDateDesc, recentOnly, useCollection, useData } from '../lib/data';
 import { useCommitments } from '../lib/commitments';
 import { GROUPS } from '../lib/categories';
@@ -31,6 +32,7 @@ export function OverzichtPage() {
   return (
     <>
       <PageHead eyebrow={new Date().toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })} title="Overzicht">
+        <Link className="btn" to="/rapport"><Icon name="download" size={18} />PDF-rapport</Link>
         <Link className="btn" to="/bankimport">Afschrift importeren</Link>
         <Link className="btn primary" to="/budget">Budget aanpassen</Link>
       </PageHead>

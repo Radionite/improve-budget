@@ -12,6 +12,7 @@ import { FacturenPage } from './pages/Facturen';
 import { BeleggenPage } from './pages/Beleggen';
 import { LeningenPage } from './pages/Leningen';
 import { InstellingenPage } from './pages/Instellingen';
+import { RapportPage } from './pages/Rapport';
 
 export function App() {
   const { user, loading, household } = useData();
@@ -40,6 +41,7 @@ export function App() {
         <Route path="facturen" element={<FacturenPage />} />
         <Route path="beleggen" element={<BeleggenPage />} />
         <Route path="leningen" element={<LeningenPage />} />
+        <Route path="rapport" element={<RapportPage />} />
         <Route path="instellingen" element={<InstellingenPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

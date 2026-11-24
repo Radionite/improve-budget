@@ -13,6 +13,7 @@ const NAV = [
   { to: '/facturen', label: 'Facturen & garanties', short: 'Facturen', icon: 'file' },
   { to: '/beleggen', label: 'Beleggen', short: 'Beleggen', icon: 'trend' },
   { to: '/leningen', label: 'Studie & leningen', short: 'Leningen', icon: 'cap' },
+  { to: '/rapport', label: 'PDF-rapport', short: 'Rapport', icon: 'download' },
   { to: '/instellingen', label: 'Instellingen', short: 'Instellingen', icon: 'gear' },
 ];
 /** Op de telefoon staan deze onderaan; de rest zit onder "Meer". */
