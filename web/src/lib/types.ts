@@ -1,3 +1,4 @@
+import type { StudyLoan } from './studyLoans';
 import type { IncomeSource } from './income';
 import type { BudgetPct, Situation } from './budget';
 import type { Category, TxCategory } from './categories';
@@ -19,7 +20,9 @@ export type Household = {
   incomeSources?: IncomeSource[];
   ownIbans: string[];
   invest?: { start: number; monthly: number; rate: number; years: number; infl: number };
+  /** Oud: één studieschuld. Nieuw: studyLoans. */
   studyLoan?: { balance: number; rate: number; term: number; extra: number; owner: string };
+  studyLoans?: StudyLoan[];
 };
 
 export type Person = {

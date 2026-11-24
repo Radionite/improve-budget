@@ -11,6 +11,7 @@ import { euro, euroCents, longDate, monthLabel, pct } from '../lib/format';
 import type { ReportSection } from '../lib/report';
 import type { Invoice, Transaction } from '../lib/types';
 import { warrantyInfo } from './Facturen';
+import { studyLoansOf } from '../lib/studyLoans';
 import { budgetIncome, extrasPerYear, FREQ_LABEL, incomeSources, MONTHS, paidMonths, perMonth } from '../lib/income';
 
 const STUDY_RATES = { sparen: 1.5, beleggen: 5 };
@@ -21,7 +22,7 @@ const p1 = (n: number) => pct(n, Math.abs(n - Math.round(n)) < 0.05 ? 0 : 1);
 
 export function RapportPage() {
   const { household } = useData();
-  const { monthly, derived, people, pets, vehicles, loans, studyPayment } = useCommitments();
+  const { monthly, derived, people, pets, vehicles, loans, studyPayment, ready: householdReady } = useCommitments();
   const cats = useCategories();
   const { amounts: budgetNow } = useBudgetAmounts();
   const invoices = useCollection<Invoice>('invoices', byDateDesc);
@@ -34,6 +35,7 @@ export function RapportPage() {
   const [lastFile, setLastFile] = useState<File | null>(null);
   const activeMonth = month || months[0] || '';
 
+  const dataReady = householdReady && invoices.ready && txs.ready;
   if (!household) return null;
   const income = household.income || 0;
   const share = (n: number) => (income ? (n / income) * 100 : 0);
@@ -47,8 +49,8 @@ export function RapportPage() {
     }) as Record<string, number>;
     const groupSums = cats.groupSums(amounts);
     const planned = GROUPS.reduce((s, g) => s + groupSums[g.id], 0);
-    const sl = household.studyLoan;
-    const debt = (sl?.balance ?? 0) + loans.reduce((s, l) => s + (l.balance || 0), 0);
+    const studyList = studyLoansOf(household).filter((x) => x.balance > 0);
+    const debt = studyList.reduce((sum, x) => sum + x.balance, 0) + loans.reduce((s, l) => s + (l.balance || 0), 0);
     const loanMonthly = studyPayment + loans.reduce((s, l) => s + (l.monthly || 0), 0);
     const inv = invoices.items.map((i) => ({ ...i, w: warrantyInfo(i) }));
     const sections: ReportSection[] = [];
@@ -163,14 +165,20 @@ export function RapportPage() {
 
     // 5. Leningen en studie
     const leningTables: ReportSection['tables'] = [];
-    if (sl && sl.balance > 0) {
-      const pay = annuity(sl.balance, sl.rate, sl.term * 12);
-      const sim = simulateLoan(sl.balance, sl.rate, pay, sl.extra || 0, sl.term * 12);
+    if (studyList.length) {
+      const rows = studyList.map((x) => {
+        const pay = annuity(x.balance, x.rate, x.term * 12);
+        const sim = simulateLoan(x.balance, x.rate, pay, x.extra || 0, x.term * 12);
+        const owner = people.find((p) => p.id === x.owner)?.name;
+        return { x, pay, sim, owner };
+      });
       leningTables.push({
-        title: 'Studieschuld (DUO)',
-        head: ['Openstaand', 'Rente', 'Regeling', 'Maandbedrag', 'Schuldvrij in', 'Totale rente'],
-        body: [[euro(sl.balance), pct(sl.rate, 2), `${sl.term} jaar`, euro(pay + (sl.extra || 0)), String(new Date().getFullYear() + Math.ceil(sim.months / 12)), euro(sim.interest)]],
-        right: [0, 1, 3, 5],
+        title: studyList.length > 1 ? 'Studieschulden (DUO)' : 'Studieschuld (DUO)',
+        head: ['Naam', 'Openstaand', 'Rente', 'Regeling', 'Maandbedrag', 'Schuldvrij in', 'Totale rente'],
+        body: rows.map(({ x, pay, sim, owner }) => [owner ? `${x.name} (${owner})` : x.name, euro(x.balance), pct(x.rate, 2), `${x.term} jaar`, euro(pay + (x.extra || 0)),
+          String(new Date().getFullYear() + Math.ceil(sim.months / 12)), euro(sim.interest)]),
+        foot: studyList.length > 1 ? ['Totaal', euro(rows.reduce((s2, r) => s2 + r.x.balance, 0)), '', '', euro(rows.reduce((s2, r) => s2 + r.pay + (r.x.extra || 0), 0)), '', euro(rows.reduce((s2, r) => s2 + r.sim.interest, 0))] : undefined,
+        right: [1, 2, 4, 6],
       });
     }
     if (loans.length) {
@@ -291,7 +299,7 @@ export function RapportPage() {
         </div>
         {error && <p className="notice red" role="alert">{error}</p>}
         <div className="row">
-          <button className="btn primary" onClick={make} disabled={busy}><Icon name="download" size={18} />{busy ? 'Bezig…' : 'PDF downloaden'}</button>
+          <button className="btn primary" onClick={make} disabled={busy || !dataReady}><Icon name="download" size={18} />{!dataReady ? 'Gegevens laden…' : busy ? 'Bezig…' : 'PDF downloaden'}</button>
           {canShare && <button className="btn" onClick={shareFile}>Delen of opslaan…</button>}
         </div>
         <p className="tiny muted">Het rapport wordt op dit apparaat gemaakt; er wordt niets verstuurd. Op de telefoon kun je het daarna delen of in Bestanden bewaren.</p>

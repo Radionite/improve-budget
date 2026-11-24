@@ -6,6 +6,7 @@ import { useCommitments } from '../lib/commitments';
 import { GROUPS } from '../lib/categories';
 import { useCategories } from '../lib/useCategories';
 import { useBudgetAmounts } from '../lib/useBudget';
+import { studyLoansOf } from '../lib/studyLoans';
 import { euro, longDate, monthLabel, pct } from '../lib/format';
 import { warrantyInfo } from './Facturen';
 import type { Invoice, Transaction } from '../lib/types';
@@ -28,7 +29,7 @@ export function OverzichtPage() {
   const open = txs.items.filter((t) => !t.cat).length;
   const soon = invoices.items.map((i) => ({ ...i, w: warrantyInfo(i) })).filter((i) => i.w.status === 'binnenkort').sort((a, b) => a.w.days - b.w.days);
   const active = invoices.items.filter((i) => warrantyInfo(i).status !== 'verlopen').length;
-  const debt = (household.studyLoan?.balance ?? 0) + loans.reduce((s, l) => s + (l.balance || 0), 0);
+  const debt = studyLoansOf(household).reduce((sum, x) => sum + (x.balance || 0), 0) + loans.reduce((s, l) => s + (l.balance || 0), 0);
   const loanMonthly = studyPayment + loans.reduce((s, l) => s + (l.monthly || 0), 0);
 
   return (

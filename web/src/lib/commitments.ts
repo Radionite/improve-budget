@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useCollection, useData } from './data';
-import { annuity, type Situation } from './budget';
+import { type Situation } from './budget';
+import { studyLoansOf, studyPayment as studyPaymentOf } from './studyLoans';
 import type { CategoryKey } from './categories';
 import type { Loan, Person, Pet, Vehicle } from './types';
 
@@ -17,8 +18,7 @@ export function useCommitments() {
   return useMemo(() => {
     const adults = people.items.filter((p) => p.role === 'adult');
     const kids = people.items.filter((p) => p.role === 'child');
-    const sl = household?.studyLoan;
-    const studyPayment = sl && sl.balance > 0 ? annuity(sl.balance, sl.rate, sl.term * 12) + (sl.extra || 0) : 0;
+    const studyPayment = studyLoansOf(household ?? null).reduce((sum, sl) => sum + studyPaymentOf(sl), 0);
 
     const monthly: Partial<Record<CategoryKey, number>> = {
       zakouders: adults.reduce((s, p) => s + (p.zakgeld || 0), 0),
@@ -41,8 +41,9 @@ export function useCommitments() {
         }
       : null;
 
-    return { monthly, derived, people: people.items, pets: pets.items, vehicles: vehicles.items, loans: loans.items, studyPayment };
-  }, [household, people.items, pets.items, vehicles.items, loans.items]);
+    const ready = people.ready && pets.ready && vehicles.ready && loans.ready;
+    return { monthly, derived, people: people.items, pets: pets.items, vehicles: vehicles.items, loans: loans.items, studyPayment, ready };
+  }, [household, people.items, pets.items, vehicles.items, loans.items, people.ready, pets.ready, vehicles.ready, loans.ready]);
 }
 
 /** Opties voor 'Hoort bij': gezinsleden, huisdieren en voertuigen. */
