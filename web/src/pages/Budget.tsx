@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
 import { PageHead } from '../components/Layout';
-import { NumberInput, Segmented } from '../components/Fields';
+import { NumberInput } from '../components/Fields';
 import { Icon } from '../components/Icon';
 import { useData } from '../lib/data';
 import { useCommitments } from '../lib/commitments';
 import { GROUPS, type Category, type GroupId } from '../lib/categories';
-import { recommend, situationName, type Situation } from '../lib/budget';
 import { useCategories } from '../lib/useCategories';
 import { useBudgetAmounts } from '../lib/useBudget';
 import { budgetIncome, incomeSources, type IncomeSource } from '../lib/income';
@@ -22,7 +20,7 @@ const cents = (n: number) => Math.round(n * 100) / 100;
 
 export function BudgetPage() {
   const { household, update } = useData();
-  const { monthly, derived } = useCommitments();
+  const { monthly } = useCommitments();
   const cats = useCategories();
   const { amounts: stored, linked } = useBudgetAmounts();
   const [draft, setDraft] = useState<Record<string, number>>(stored);
@@ -34,20 +32,12 @@ export function BudgetPage() {
   useEffect(() => { setDraft(stored); }, [stored]);
   useEffect(() => { setSources(storedSources); }, [storedSources]);
 
-  const situation: Situation = derived ?? household?.situation ?? { adults: 2, kids: 0, pets: false, cars: 0 };
-  const rec = useMemo(() => recommend(situation, {
-    studieschuld: income ? ((monthly.studieschuld ?? 0) / income) * 100 : 0,
-    lening: income ? ((monthly.lening ?? 0) / income) * 100 : 0,
-  }), [situation, income, monthly.studieschuld, monthly.lening]) as Record<string, number>;
-
   if (!household) return null;
 
   const share = (amount: number) => (income ? (amount / income) * 100 : 0);
   const sum = cats.visible.reduce((s, c) => s + (draft[c.key] ?? 0), 0);
   const left = cents(income - sum);
   const groups = cats.groupSums(draft);
-  const recGroups: Record<GroupId, number> = { vast: 0, leven: 0, sparen: 0 };
-  cats.visible.forEach((c) => { if (!c.custom) recGroups[c.group] += rec[c.key] ?? 0; });
   const dirty = JSON.stringify(draft) !== JSON.stringify(stored) || JSON.stringify(sources) !== JSON.stringify(storedSources);
 
   const setAmount = (key: string, v: number) => {
@@ -65,12 +55,6 @@ export function BudgetPage() {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
-  const applyAdvice = () => {
-    const next = { ...draft };
-    cats.visible.filter((c) => !c.custom).forEach((c) => { next[c.key] = Math.round((income * (rec[c.key] ?? 0)) / 100); });
-    setDraft(next);
-  };
-  const setSituation = (patch: Partial<Situation>) => update({ situation: { ...situation, ...patch } });
 
   const addCategory = async (group: GroupId, name: string) => {
     const key = `c_${Math.random().toString(36).slice(2, 8)}`;
@@ -93,29 +77,8 @@ export function BudgetPage() {
   return (
     <>
       <PageHead eyebrow="Maandbudget" title="Budget verdelen">
-        <button className="btn" onClick={applyAdvice} title="Zet alle standaardcategorieën op het advies">Advies overnemen</button>
         <button className="btn primary" onClick={save} disabled={!dirty}>{saved ? 'Opgeslagen' : 'Opslaan'}</button>
       </PageHead>
-
-      <section className="card" aria-labelledby="h-sit">
-        <div className="card-head">
-          <div className="stack" style={{ gap: 4 }}>
-            <h2 id="h-sit">Jouw situatie</h2>
-            <span className="small muted">Het advies past zich aan op je gezin. Nu: <strong className="strong">{situationName(situation)}</strong></span>
-          </div>
-          <Link to="/huishouden" className="small">Huishouden beheren</Link>
-        </div>
-        {derived ? (
-          <p className="small muted">Je situatie volgt automatisch uit de gezinsleden, huisdieren en voertuigen in Huishouden.</p>
-        ) : (
-          <div className="row" style={{ gap: 24, alignItems: 'flex-start' }}>
-            <Segmented label="Volwassenen" value={situation.adults} options={[{ value: 1, label: '1' }, { value: 2, label: '2' }]} onChange={(v) => setSituation({ adults: v })} />
-            <Segmented label="Kinderen" value={situation.kids} options={[0, 1, 2, 3].map((n) => ({ value: n, label: n === 0 ? 'Geen' : n === 3 ? '3+' : String(n) }))} onChange={(v) => setSituation({ kids: v })} />
-            <Segmented label="Huisdieren" value={situation.pets} options={[{ value: false, label: 'Nee' }, { value: true, label: 'Ja' }]} onChange={(v) => setSituation({ pets: v })} />
-            <Segmented label="Auto's" value={Math.min(situation.cars, 2)} options={[{ value: 0, label: 'Geen' }, { value: 1, label: '1' }, { value: 2, label: '2+' }]} onChange={(v) => setSituation({ cars: v })} />
-          </div>
-        )}
-      </section>
 
       <IncomeCard sources={sources} onChange={setSources} />
 
@@ -143,7 +106,7 @@ export function BudgetPage() {
               <span className="dot" style={{ background: g.color, marginTop: 4 }} />
               <div className="stack" style={{ gap: 2 }}>
                 <span style={{ fontWeight: 600 }}>{g.name}</span>
-                <span className="small muted">{euro(groups[g.id])} · {p(share(groups[g.id]))} · advies {p(recGroups[g.id])}</span>
+                <span className="small muted">{euro(groups[g.id])} · {p(share(groups[g.id]))}</span>
               </div>
             </div>
           ))}
@@ -157,11 +120,11 @@ export function BudgetPage() {
               <span className="dot" style={{ background: g.color, width: 14, height: 14 }} />
               <div className="stack" style={{ gap: 2 }}><h2>{g.name}</h2><span className="small muted">{g.desc}</span></div>
             </div>
-            <span><span className="display strong" style={{ fontSize: 22 }}>{euro(groups[g.id])}</span> <span className="small muted">{p(share(groups[g.id]))} · advies {p(recGroups[g.id])}</span></span>
+            <span><span className="display strong" style={{ fontSize: 22 }}>{euro(groups[g.id])}</span> <span className="small muted">{p(share(groups[g.id]))}</span></span>
           </div>
           <ul className="list">
             {cats.visible.filter((c) => c.group === g.id).map((c) => (
-              <CategoryRow key={c.key} cat={c} amount={draft[c.key] ?? 0} income={income} rec={c.custom ? null : rec[c.key] ?? 0} known={(monthly as Record<string, number | undefined>)[c.key]} linked={linked.has(c.key)}
+              <CategoryRow key={c.key} cat={c} amount={draft[c.key] ?? 0} income={income} known={(monthly as Record<string, number | undefined>)[c.key]} linked={linked.has(c.key)}
                 onChange={(v) => setAmount(c.key, v)} onRelink={() => relink(c.key)} onRemove={() => removeCategory(c)} />
             ))}
           </ul>
@@ -179,15 +142,14 @@ export function BudgetPage() {
       )}
 
       <p className="small muted" style={{ maxWidth: 780 }}>
-        Vul per categorie een bedrag of een percentage in; het bedrag wordt bewaard. Het advies is een vertrekpunt op basis van je gezinssituatie,
-        geen officieel advies. Eigen categorieën hebben geen advies. Een verwijderde categorie verdwijnt ook uit de bankimport.
+        Vul per categorie een bedrag of een percentage in; het bedrag wordt bewaard. Een verwijderde categorie verdwijnt ook uit de bankimport.
       </p>
     </>
   );
 }
 
-function CategoryRow({ cat, amount, income, rec, known, linked, onChange, onRelink, onRemove }: {
-  cat: Category; amount: number; income: number; rec: number | null; known?: number; linked: boolean; onChange: (v: number) => void; onRelink: () => void; onRemove: () => void;
+function CategoryRow({ cat, amount, income, known, linked, onChange, onRelink, onRemove }: {
+  cat: Category; amount: number; income: number; known?: number; linked: boolean; onChange: (v: number) => void; onRelink: () => void; onRemove: () => void;
 }) {
   const id = `r-${cat.key}`;
   const share = income ? (amount / income) * 100 : 0;
@@ -216,12 +178,6 @@ function CategoryRow({ cat, amount, income, rec, known, linked, onChange, onReli
         <span className="muted">%</span>
       </div>
       <div className="row cat-actions" style={{ gap: 4, flexWrap: 'nowrap' }}>
-      <span style={{ width: 112, display: 'inline-flex', justifyContent: 'flex-end' }}>
-        {rec === null ? <span className="tiny muted">geen advies</span>
-          : Math.abs(share - rec) < 0.5
-            ? <span className="pill green"><Icon name="check" size={12} />advies</span>
-            : <button type="button" className="pill orange" style={{ border: 0, cursor: 'pointer', font: 'inherit', fontSize: 12, fontWeight: 600 }} title={`Advies overnemen: ${euro((income * rec) / 100)}`} onClick={() => onChange(Math.round((income * rec) / 100))}>advies {p(rec)}</button>}
-      </span>
       <button type="button" className="btn icon" aria-label={`${cat.name} verwijderen`} title="Categorie verwijderen" onClick={onRemove}><Icon name="x" size={16} /></button>
       </div>
     </li>

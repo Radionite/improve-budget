@@ -4,7 +4,7 @@ import { Icon } from '../components/Icon';
 import { byDateDesc, recentOnly, useCollection, useData } from '../lib/data';
 import { useCommitments, WEEKS_PER_MONTH } from '../lib/commitments';
 import { GROUPS } from '../lib/categories';
-import { annuity, futureValue, recommend, simulateLoan, situationName, type Situation } from '../lib/budget';
+import { annuity, futureValue, simulateLoan, situationName, type Situation } from '../lib/budget';
 import { useCategories } from '../lib/useCategories';
 import { useBudgetAmounts } from '../lib/useBudget';
 import { euro, euroCents, longDate, monthLabel, pct } from '../lib/format';
@@ -43,10 +43,6 @@ export function RapportPage() {
   const buildSections = (): ReportSection[] => {
     const amounts = budgetNow;
     const situation: Situation = derived ?? household.situation ?? { adults: 2, kids: 0, pets: false, cars: 0 };
-    const rec = recommend(situation, {
-      studieschuld: income ? ((monthly.studieschuld ?? 0) / income) * 100 : 0,
-      lening: income ? ((monthly.lening ?? 0) / income) * 100 : 0,
-    }) as Record<string, number>;
     const groupSums = cats.groupSums(amounts);
     const planned = GROUPS.reduce((s, g) => s + groupSums[g.id], 0);
     const studyList = studyLoansOf(household).filter((x) => x.balance > 0);
@@ -89,15 +85,14 @@ export function RapportPage() {
     // 2. Budget per categorie
     sections.push({
       title: 'Budget per maand',
-      note: 'Het advies is een vertrekpunt op basis van de gezinssituatie, geen officieel advies. Eigen categorieën hebben geen advies.',
       tables: GROUPS.map((g) => {
         const rows = cats.visible.filter((c) => c.group === g.id);
         return {
           title: g.name,
-          head: ['Categorie', 'Bedrag', '% inkomen', 'Advies'],
-          body: rows.map((c) => [c.name + (c.custom ? ' (eigen)' : ''), euro(amounts[c.key] ?? 0), p1(share(amounts[c.key] ?? 0)), c.custom ? '-' : p1(rec[c.key] ?? 0)]),
-          foot: ['Totaal', euro(groupSums[g.id]), p1(share(groupSums[g.id])), p1(rows.filter((c) => !c.custom).reduce((s, c) => s + (rec[c.key] ?? 0), 0))],
-          right: [1, 2, 3],
+          head: ['Categorie', 'Bedrag', '% inkomen'],
+          body: rows.map((c) => [c.name + (c.custom ? ' (eigen)' : ''), euro(amounts[c.key] ?? 0), p1(share(amounts[c.key] ?? 0))]),
+          foot: ['Totaal', euro(groupSums[g.id]), p1(share(groupSums[g.id]))],
+          right: [1, 2],
         };
       }),
     });
@@ -287,7 +282,7 @@ export function RapportPage() {
       <PageHead eyebrow="Alles op papier" title="PDF-rapport" />
       <section className="card" aria-labelledby="h-opties">
         <h2 id="h-opties">Rapport samenstellen</h2>
-        <p className="small muted">Het rapport bevat: samenvatting, budget per categorie met advies, werkelijk vs budget van de gekozen maand, huishouden (gezin, zakgeld, kleedgeld, huisdieren, voertuigen), studie & leningen, beleggingsplan en facturen met garanties.</p>
+        <p className="small muted">Het rapport bevat: samenvatting, budget per categorie, werkelijk vs budget van de gekozen maand, huishouden (gezin, zakgeld, kleedgeld, huisdieren, voertuigen), studie & leningen, beleggingsplan en facturen met garanties.</p>
         <div className="grid" style={{ '--min': '220px', alignItems: 'end' } as React.CSSProperties}>
           <div className="field">
             <label htmlFor="r-maand">Maand voor werkelijk vs budget</label>

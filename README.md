@@ -2,7 +2,7 @@
 
 *Ons huishoudbudget, samen beheerd.*
 
-Webapp om samen het huishoudbudget te beheren: budget in procenten met advies per gezinssituatie,
+Webapp om samen het huishoudbudget te beheren: budget in bedragen en procenten met inkomsten per maand, kwartaal of jaar,
 gezin/huisdieren/voertuigen, bankafschriften inlezen (de app vraagt wat iets is en onthoudt het),
 facturen en garanties, beleggingsprojecties, studieschuld en studiesparen voor de kinderen.
 

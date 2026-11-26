@@ -101,7 +101,7 @@ export function HuishoudenPage() {
         <ul className="cards" style={{ '--min': '340px' } as React.CSSProperties}>
           {vehicles.map((v) => <VehicleCard key={v.id} v={v} save={save('vehicles', v.id)} remove={() => remove('vehicles', v.id, v.name)} />)}
         </ul>
-        {!vehicles.length && <p className="muted small">Geen voertuigen. Het budgetadvies rekent dan met openbaar vervoer en fiets.</p>}
+        {!vehicles.length && <p className="muted small">Nog geen voertuigen toegevoegd.</p>}
       </section>
     </>
   );

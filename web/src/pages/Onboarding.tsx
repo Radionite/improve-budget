@@ -3,7 +3,6 @@ import { arrayUnion, collection, doc, getDoc, serverTimestamp, setDoc, updateDoc
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { useData } from '../lib/data';
-import { recommend } from '../lib/budget';
 
 export function OnboardingPage() {
   const { user } = useData();
@@ -27,7 +26,8 @@ export function OnboardingPage() {
         inviteCode: '',
         income: 0,
         situation,
-        budget: recommend(situation, { studieschuld: 0, lening: 0 }),
+        budget: {},
+        budgetAmounts: {},
         ownIbans: [],
         createdAt: serverTimestamp(),
       });
